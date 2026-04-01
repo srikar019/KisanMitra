@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getIndianAgriNews } from '../services/geminiService';
+import { fetchIndianAgriNews } from '../services/apiClient';
 import { postToFeed, onFeedSnapshot } from '../services/communityFeedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -113,7 +113,7 @@ const IndianAgriNews: React.FC = () => {
                 setLoading(true);
                 setError(null);
                 setData(null);
-                const result = await getIndianAgriNews(searchedLocation, searchedTopic, searchedTime, language);
+                const result = await fetchIndianAgriNews(searchedLocation, searchedTopic, searchedTime, language);
                 setData(result);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching news.');

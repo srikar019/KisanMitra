@@ -303,6 +303,197 @@ app.post('/api/getRecipes', async (req, res) => {
 });
 
 /**
+ * POST /api/getIndianAgriNews
+ * Gets Indian agriculture news, government schemes, and incentives
+ */
+app.post('/api/getIndianAgriNews', async (req, res) => {
+  try {
+    const { location, topic, timeFilter, language = 'en' } = req.body;
+    
+    const validation = validateLanguage(language);
+    if (!validation.isValid) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    
+    const sanitizedLocation = location ? sanitizeInput(location) : 'India';
+    const sanitizedTopic = topic ? sanitizeInput(topic) : '';
+    const topicQuery = sanitizedTopic ? ` about ${sanitizedTopic}` : '';
+    
+    // Build Exa search options
+    interface ExaSearchOptions {
+      category?: string;
+      type?: string;
+      numResults?: number;
+      text?: { maxCharacters: number };
+      startPublishedDate?: string;
+    }
+    
+    const exaOptions: ExaSearchOptions = {
+      category: 'news',
+      type: 'auto',
+      numResults: 25,
+      text: { maxCharacters: 5000 }
+    };
+    
+    if (timeFilter) {
+      const now = new Date();
+      let daysToSub = 0;
+      if (timeFilter === '1d') daysToSub = 1;
+      else if (timeFilter === '7d') daysToSub = 7;
+      else if (timeFilter === '30d') daysToSub = 30;
+      else if (timeFilter === '90d') daysToSub = 90;
+      else if (timeFilter === '180d') daysToSub = 180;
+      
+      if (daysToSub > 0) {
+        now.setDate(now.getDate() - daysToSub);
+        exaOptions.startPublishedDate = now.toISOString();
+      }
+    }
+    
+    // Use Exa for web search (server-side - no CORS issues!)
+    const exaResults = await exa.searchAndContents(
+      `Latest agriculture news ${sanitizedLocation}${topicQuery}`,
+      exaOptions as Parameters<typeof exa.searchAndContents>[1]
+    );
+    
+    const context = exaResults.results.map(r => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
+    
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Using this real-time news context: ${context}\n\nProvide Indian agri news for ${sanitizedLocation}${sanitizedTopic ? ` focused on ${sanitizedTopic}` : ''}. You MUST extract and return up to 10 distinct news articles, exactly 5 related government schemes, and exactly 5 financial incentives. If the text does not contain enough specific schemes or incentives, use your knowledge base to fill out the remaining slots with highly relevant national or state-level agricultural schemes and incentives. Respond STRICTLY with a valid JSON object matching this schema:
+{
+  "news": [{"title": string, "summary": string, "source": string, "url": string, "publishedDate": string}],
+  "schemes": [{"name": string, "description": string, "benefits": ["string"], "eligibility": string, "howToApply": string, "officialLink": string}],
+  "incentives": [{"name": string, "description": string, "benefitAmount": string, "eligibility": string, "applicationProcess": string, "link": string}]
+}`,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+    
+    const parsed = JSON.parse(response.text || '{}');
+    const sources = exaResults.results.map(r => ({ uri: r.url, title: r.title ?? 'Source' }));
+    res.json({ ...parsed, sources });
+    
+  } catch (error) {
+    console.error('Indian Agri News error:', error);
+    res.status(500).json({ error: 'Failed to get Indian agri news' });
+  }
+});
+
+/**
+ * POST /api/getProfitForecast
+ * Gets profit forecast with RAG from Exa
+ */
+app.post('/api/getProfitForecast', async (req, res) => {
+  try {
+    const { cropName, location, language = 'en' } = req.body;
+    
+    const validation = validateAll(
+      validateRequired(cropName, 'Crop name'),
+      validateLocation(location),
+      validateLanguage(language)
+    );
+    
+    if (!validation.isValid) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    
+    const sanitizedCrop = sanitizeInput(cropName);
+    const sanitizedLocation = sanitizeInput(location);
+    
+    const exaResults = await exa.searchAndContents(
+      `Profit margin forecast, demand, and analysis for ${sanitizedCrop} in ${sanitizedLocation}`,
+      {
+        type: 'auto',
+        numResults: 3,
+        text: { maxCharacters: 5000 }
+      }
+    );
+    
+    const context = exaResults.results.map(r => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
+    
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Using this real-time web context: ${context}\n\nProvide Profit forecast for ${sanitizedCrop} in ${sanitizedLocation}. Respond STRICTLY with a valid JSON object:
+{
+  "predictedMarketPrice": number,
+  "priceUnit": string,
+  "totalRevenue": number,
+  "netProfitOrLoss": number,
+  "returnOnInvestment": number,
+  "analysis": string,
+  "alternativeCrops": [{"cropName": string, "profitMarginChange": string, "reasoning": string}]
+}`,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+    
+    const parsed = JSON.parse(response.text || '{}');
+    const sources = exaResults.results.map(r => ({ uri: r.url, title: r.title ?? 'Source' }));
+    res.json({ ...parsed, sources });
+    
+  } catch (error) {
+    console.error('Profit forecast error:', error);
+    res.status(500).json({ error: 'Failed to get profit forecast' });
+  }
+});
+
+/**
+ * POST /api/getPriceBrokerAnalysis
+ * Gets price broker analysis with RAG from Exa
+ */
+app.post('/api/getPriceBrokerAnalysis', async (req, res) => {
+  try {
+    const { cropName, location, language = 'en' } = req.body;
+    
+    const validation = validateAll(
+      validateRequired(cropName, 'Crop name'),
+      validateLocation(location),
+      validateLanguage(language)
+    );
+    
+    if (!validation.isValid) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    
+    const sanitizedCrop = sanitizeInput(cropName);
+    const sanitizedLocation = sanitizeInput(location);
+    
+    const exaResults = await exa.searchAndContents(
+      `Broker price analysis, trends, and demand for ${sanitizedCrop} in ${sanitizedLocation}`,
+      {
+        type: 'auto',
+        numResults: 3,
+        text: { maxCharacters: 5000 }
+      }
+    );
+    
+    const context = exaResults.results.map(r => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
+    
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Using this real-time web context: ${context}\n\nProvide Broker price analysis for ${sanitizedCrop} in ${sanitizedLocation}. Respond in JSON.`,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+    
+    const parsed = JSON.parse(response.text || '{}');
+    const sources = exaResults.results.map(r => ({ uri: r.url, title: r.title ?? 'Source' }));
+    res.json({ ...parsed, sources });
+    
+  } catch (error) {
+    console.error('Price broker analysis error:', error);
+    res.status(500).json({ error: 'Failed to get price broker analysis' });
+  }
+});
+
+/**
  * Health check endpoint
  */
 app.get('/health', (req, res) => {

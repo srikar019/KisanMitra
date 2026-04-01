@@ -4,13 +4,13 @@ import { ActiveView } from '../types';
 import type { WeatherData, DiseaseReport, PlantingRecommendation, PlantingRequest, DiseaseHotspot, SoilHealthReport, PlantingRecommendationResponse, CropPricePrediction, WebSource, ChatMessage, NegotiationTerms, NegotiationResponse, CropYieldRequest, CropYieldResponse, PriceBrokerAnalysis, MicroclimateAnalysis, Alert, Livestock, LivestockHealthAnalysis, ProfitForecastRequest, ProfitForecastResponse, IndianAgriNewsResponse, RecipeResponse, ParsedListItem, ParsedCommand, DynamicSubscriptionPreferences, WeeklyProduceItem, CuratedItem, CSATier, FarmMachinery, MachineryRentalRequest, Zone, ProductListing } from '../types';
 
 if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
+    throw new Error("API_KEY environment variable is not set");
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 if (!process.env.EXA_API_KEY) {
-  throw new Error("EXA_API_KEY environment variable is not set");
+    throw new Error("EXA_API_KEY environment variable is not set");
 }
 const exa = new Exa(process.env.EXA_API_KEY);
 
@@ -32,7 +32,7 @@ const handleGeminiError = (error: unknown, context: string): never => {
     if (error instanceof Error && (error.message.includes('429') || error.message.toUpperCase().includes('RESOURCE_EXHAUSTED'))) {
         throw new Error("API request limit reached. Please try again in a few minutes.");
     }
-     if (error instanceof SyntaxError) {
+    if (error instanceof SyntaxError) {
         throw new Error("Failed to parse the data from the AI. The format was unexpected.");
     }
     throw new Error(`An AI error occurred while ${context}.`);
@@ -48,7 +48,7 @@ const extractJson = (text: string): string => {
     const lastBrace = text.lastIndexOf('}');
     const firstBracket = text.indexOf('[');
     const lastBracket = text.lastIndexOf(']');
-    
+
     // Find the outermost structure (either array or object)
     if (firstBrace !== -1 && lastBrace > firstBrace && (firstBracket === -1 || firstBrace < firstBracket)) {
         return text.substring(firstBrace, lastBrace + 1);
@@ -56,7 +56,7 @@ const extractJson = (text: string): string => {
     if (firstBracket !== -1 && lastBracket > firstBracket) {
         return text.substring(firstBracket, lastBracket + 1);
     }
-    
+
     return text.trim();
 };
 
@@ -76,7 +76,7 @@ export const getRecipesForIngredients = async (ingredients: string[], availableC
     try {
         const cropsListStr = availableCrops.length > 0 ? availableCrops.join(', ') : "No fresh crops currently listed.";
         const prefsStr = dietaryPrefs.length > 0 ? `Dietary Restrictions: ${dietaryPrefs.join(', ')}.` : '';
-        
+
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: `User has: "${ingredients.join(', ')}". 
@@ -141,11 +141,11 @@ export const getRecipesForIngredients = async (ingredients: string[], availableC
         const rawText = response.text || '';
         const jsonText = extractJson(rawText);
         if (!jsonText) throw new Error("AI returned empty response.");
-        
+
         const data = JSON.parse(jsonText) as RecipeResponse;
-        
+
         if (!data || !data.recipes || !Array.isArray(data.recipes)) {
-             throw new Error("Malformed recipe data received.");
+            throw new Error("Malformed recipe data received.");
         }
 
         const result = { recipes: data.recipes };
@@ -158,42 +158,42 @@ export const getRecipesForIngredients = async (ingredients: string[], availableC
 };
 
 export const getWeatherForecast = async (location: string): Promise<WeatherData> => {
-  const cacheKey = location.trim().toLowerCase();
-  if (weatherCache.has(cacheKey)) return weatherCache.get(cacheKey)!;
-  try {
-    const { lat, lng } = await getCoordinatesForLocation(location);
-    const params = new URLSearchParams({
-      latitude: lat.toString(), longitude: lng.toString(),
-      current: 'temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code',
-      daily: 'weather_code,temperature_2m_max,temperature_2m_min',
-      forecast_days: '5', timezone: 'auto',
-    });
-    const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
-    const weatherResponse = await fetch(url);
-    if (!weatherResponse.ok) throw new Error(`Failed to fetch weather data: ${weatherResponse.statusText}`);
-    const data = await weatherResponse.json();
-    if (data.error) throw new Error(`Open-Meteo API Error: ${data.reason}`);
-    
-    const weatherData: WeatherData = {
-      currentWeather: {
-        temperature: Math.round(data.current?.temperature_2m || 0),
-        condition: getWeatherConditionFromWMO(data.current?.weather_code || 0),
-        humidity: data.current?.relative_humidity_2m || 0,
-        windSpeed: Math.round(data.current?.wind_speed_10m || 0),
-      },
-      dailyForecast: (data.daily?.time || []).map((dateString: string, index: number) => ({
-        day: new Date(dateString).toLocaleDateString('en-US', { weekday: 'short' }),
-        high: Math.round(data.daily.temperature_2m_max[index] || 0),
-        low: Math.round(data.daily.temperature_2m_min[index] || 0),
-        condition: getWeatherConditionFromWMO(data.daily.weather_code[index] || 0),
-      })),
-      seasonalContext: getSeasonalContext(lat),
-    };
-    weatherCache.set(cacheKey, weatherData);
-    return weatherData;
-  } catch (error) {
-    return handleGeminiError(error, `fetching weather forecast for "${location}"`);
-  }
+    const cacheKey = location.trim().toLowerCase();
+    if (weatherCache.has(cacheKey)) return weatherCache.get(cacheKey)!;
+    try {
+        const { lat, lng } = await getCoordinatesForLocation(location);
+        const params = new URLSearchParams({
+            latitude: lat.toString(), longitude: lng.toString(),
+            current: 'temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code',
+            daily: 'weather_code,temperature_2m_max,temperature_2m_min',
+            forecast_days: '5', timezone: 'auto',
+        });
+        const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+        const weatherResponse = await fetch(url);
+        if (!weatherResponse.ok) throw new Error(`Failed to fetch weather data: ${weatherResponse.statusText}`);
+        const data = await weatherResponse.json();
+        if (data.error) throw new Error(`Open-Meteo API Error: ${data.reason}`);
+
+        const weatherData: WeatherData = {
+            currentWeather: {
+                temperature: Math.round(data.current?.temperature_2m || 0),
+                condition: getWeatherConditionFromWMO(data.current?.weather_code || 0),
+                humidity: data.current?.relative_humidity_2m || 0,
+                windSpeed: Math.round(data.current?.wind_speed_10m || 0),
+            },
+            dailyForecast: (data.daily?.time || []).map((dateString: string, index: number) => ({
+                day: new Date(dateString).toLocaleDateString('en-US', { weekday: 'short' }),
+                high: Math.round(data.daily.temperature_2m_max[index] || 0),
+                low: Math.round(data.daily.temperature_2m_min[index] || 0),
+                condition: getWeatherConditionFromWMO(data.daily.weather_code[index] || 0),
+            })),
+            seasonalContext: getSeasonalContext(lat),
+        };
+        weatherCache.set(cacheKey, weatherData);
+        return weatherData;
+    } catch (error) {
+        return handleGeminiError(error, `fetching weather forecast for "${location}"`);
+    }
 };
 
 const getWeatherConditionFromWMO = (code: number): string => {
@@ -236,96 +236,100 @@ const getSeasonalContext = (latitude: number, date: Date = new Date()): string =
 };
 
 export const getCoordinatesForLocation = async (locationName: string): Promise<{ lat: number; lng: number }> => {
-  const cacheKey = locationName.trim().toLowerCase();
-  if (coordinatesCache.has(cacheKey)) return coordinatesCache.get(cacheKey)!;
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Provide the latitude and longitude for the location: "${locationName}". Respond ONLY with JSON.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            lat: { type: Type.NUMBER },
-            lng: { type: Type.NUMBER },
-          },
-          required: ['lat', 'lng']
-        },
-      },
-    });
-    const jsonText = response.text || '{}';
-    const coords = JSON.parse(jsonText) as { lat: number; lng: number };
-    coordinatesCache.set(cacheKey, coords);
-    return coords;
-  } catch (error) {
-    return handleGeminiError(error, `getting coordinates for "${locationName}"`);
-  }
+    const cacheKey = locationName.trim().toLowerCase();
+    if (coordinatesCache.has(cacheKey)) return coordinatesCache.get(cacheKey)!;
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `Provide the latitude and longitude for the location: "${locationName}". Respond ONLY with JSON.`,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        lat: { type: Type.NUMBER },
+                        lng: { type: Type.NUMBER },
+                    },
+                    required: ['lat', 'lng']
+                },
+            },
+        });
+        const jsonText = response.text || '{}';
+        const coords = JSON.parse(jsonText) as { lat: number; lng: number };
+        coordinatesCache.set(cacheKey, coords);
+        return coords;
+    } catch (error) {
+        return handleGeminiError(error, `getting coordinates for "${locationName}"`);
+    }
 };
 
 export const detectCropDisease = async (imageBase64: string, mimeType: string, language: string = 'en'): Promise<DiseaseReport> => {
-  const cacheKey = `${imageBase64}|lang:${language}`;
-  if (diseaseReportCache.has(cacheKey)) return diseaseReportCache.get(cacheKey)!;
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: { parts: [
-        { inlineData: { data: imageBase64, mimeType } },
-        { text: `Analyze plant disease. Respond in JSON. ${getLanguageInstruction(language)}` }
-      ] },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            isHealthy: { type: Type.BOOLEAN },
-            diseaseName: { type: Type.STRING },
-            description: { type: Type.STRING },
-            treatment: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-        },
-      },
-    });
-    const report = JSON.parse(response.text || '{}') as DiseaseReport;
-    diseaseReportCache.set(cacheKey, report);
-    return report;
-  } catch (error) {
-    return handleGeminiError(error, 'detecting crop disease');
-  }
+    const cacheKey = `${imageBase64}|lang:${language}`;
+    if (diseaseReportCache.has(cacheKey)) return diseaseReportCache.get(cacheKey)!;
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: {
+                parts: [
+                    { inlineData: { data: imageBase64, mimeType } },
+                    { text: `Analyze plant disease. Respond in JSON. ${getLanguageInstruction(language)}` }
+                ]
+            },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        isHealthy: { type: Type.BOOLEAN },
+                        diseaseName: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        treatment: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                },
+            },
+        });
+        const report = JSON.parse(response.text || '{}') as DiseaseReport;
+        diseaseReportCache.set(cacheKey, report);
+        return report;
+    } catch (error) {
+        return handleGeminiError(error, 'detecting crop disease');
+    }
 };
 
 export const analyzeSoilHealth = async (imageBase64: string, mimeType: string, language: string = 'en'): Promise<SoilHealthReport> => {
-  const cacheKey = `${imageBase64}|lang:${language}`;
-  if (soilHealthCache.has(cacheKey)) return soilHealthCache.get(cacheKey)!;
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: { parts: [
-        { inlineData: { data: imageBase64, mimeType } },
-        { text: `Analyze soil health. Respond in JSON. ${getLanguageInstruction(language)}` }
-      ] },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            soilType: { type: Type.STRING },
-            texture: { type: Type.STRING },
-            phLevel: { type: Type.STRING },
-            organicMatter: { type: Type.STRING },
-            nutrientAnalysis: { type: Type.STRING },
-            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: ['soilType', 'texture', 'phLevel', 'organicMatter', 'nutrientAnalysis', 'recommendations']
-        },
-      },
-    });
-    const report = JSON.parse(response.text || '{}') as SoilHealthReport;
-    soilHealthCache.set(cacheKey, report);
-    return report;
-  } catch (error) {
-    return handleGeminiError(error, 'analyzing soil health');
-  }
+    const cacheKey = `${imageBase64}|lang:${language}`;
+    if (soilHealthCache.has(cacheKey)) return soilHealthCache.get(cacheKey)!;
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: {
+                parts: [
+                    { inlineData: { data: imageBase64, mimeType } },
+                    { text: `Analyze soil health. Respond in JSON. ${getLanguageInstruction(language)}` }
+                ]
+            },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        soilType: { type: Type.STRING },
+                        texture: { type: Type.STRING },
+                        phLevel: { type: Type.STRING },
+                        organicMatter: { type: Type.STRING },
+                        nutrientAnalysis: { type: Type.STRING },
+                        recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['soilType', 'texture', 'phLevel', 'organicMatter', 'nutrientAnalysis', 'recommendations']
+                },
+            },
+        });
+        const report = JSON.parse(response.text || '{}') as SoilHealthReport;
+        soilHealthCache.set(cacheKey, report);
+        return report;
+    } catch (error) {
+        return handleGeminiError(error, 'analyzing soil health');
+    }
 };
 
 
@@ -336,7 +340,7 @@ export const analyzeSoilHealth = async (imageBase64: string, mimeType: string, l
 export const getLivestockHealthAnalysis = async (animal: Livestock, language: string = 'en'): Promise<LivestockHealthAnalysis> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Vet analysis for ${animal.type} ${animal.breed}. Health context: ${animal.healthStatus}. Notes: ${animal.notes || 'None'}. JSON format. ${getLanguageInstruction(language)}`,
             config: { responseMimeType: "application/json" },
         });
@@ -350,9 +354,9 @@ export const getPlantingRecommendations = async (request: PlantingRequest, langu
     try {
         const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Today is ${currentDate}. Provide planting recommendations for ${request.cropType} in ${request.location} considering soil type ${request.soilType}. Previous crop: ${request.previousCrop || 'None'}. Determine the current growing season (like Zaid/Summer, Kharif, or Rabi) based on this date and location. ${getLanguageInstruction(language)}`,
-            config: { 
+            config: {
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.OBJECT,
@@ -394,7 +398,7 @@ export const getMarketPricePrediction = async (cropName: string, location: strin
         const context = exaResults.results.map(r => `Source: ${r.title}\n${r.text}`).join('\n\n');
 
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Using this real-time web context: ${context}\n\nProvide Market price prediction for ${cropName} in ${location}. ${getLanguageInstruction(language)} Respond STRICTLY with a valid JSON object matching this schema, no markdown or conversational text:
 {
   "cropName": "${cropName}",
@@ -426,7 +430,7 @@ export const getProfitForecast = async (request: ProfitForecastRequest, language
         const context = exaResults.results.map(r => `Source: ${r.title}\n${r.text}`).join('\n\n');
 
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Using this real-time web context: ${context}\n\nProvide Profit forecast for ${request.cropName} in ${request.location}. ${getLanguageInstruction(language)} Respond STRICTLY with a valid JSON object matching this schema, no markdown or conversational text:
 {
   "predictedMarketPrice": number,
@@ -464,7 +468,7 @@ export const getIndianAgriNews = async (location?: string, topic?: string, timeF
             else if (timeFilter === '30d') daysToSub = 30;
             else if (timeFilter === '90d') daysToSub = 90;
             else if (timeFilter === '180d') daysToSub = 180;
-            
+
             if (daysToSub > 0) {
                 now.setDate(now.getDate() - daysToSub);
                 exaOptions.startPublishedDate = now.toISOString();
@@ -475,7 +479,7 @@ export const getIndianAgriNews = async (location?: string, topic?: string, timeF
         const context = exaResults.results.map((r: any) => `Source: ${r.title}\n${r.text}`).join('\n\n');
 
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Using this real-time news context: ${context}\n\nProvide Indian agri news for ${location || 'national'}${topic ? ` focused on ${topic}` : ''}. ${getLanguageInstruction(language)} You MUST extract and return up to 10 distinct news articles, exactly 5 related government schemes, and exactly 5 financial incentives. If the text does not contain enough specific schemes or incentives, use your knowledge base to fill out the remaining slots with highly relevant national or state-level agricultural schemes and incentives. Respond STRICTLY with a valid JSON object matching this schema, no markdown or conversational text:
 {
   "news": [{"title": string, "summary": string, "source": string, "url": string, "publishedDate": string}],
@@ -494,7 +498,7 @@ export const getIndianAgriNews = async (location?: string, topic?: string, timeF
 export const getChatbotResponse = async (history: ChatMessage[], language: string = 'en'): Promise<string> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: history.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] })),
             config: {
                 systemInstruction: `You are AgriGenius AI. Help farmers. 5-6 bullet points. ${getLanguageInstruction(language)}`,
@@ -509,7 +513,7 @@ export const getChatbotResponse = async (history: ChatMessage[], language: strin
 export const getOpeningOffer = async (terms: NegotiationTerms, language: string = 'en'): Promise<string> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `You are an AI negotiating for a farmer (${terms.farmerName}). The farmer is selling ${terms.quantity} ${terms.unit} of ${terms.crop}. Target price is ${terms.targetPrice} ${terms.currency}. Write a short, friendly 2-sentence opening message to a potential buyer kicking off the negotiation. ${getLanguageInstruction(language)}`,
         });
         return response.text || `Hello! I see you're interested in purchasing ${terms.quantity} ${terms.unit} of ${terms.crop}. My starting offer is ${terms.targetPrice} ${terms.currency} per ${terms.unit}. What do you think?`;
@@ -521,9 +525,9 @@ export const getOpeningOffer = async (terms: NegotiationTerms, language: string 
 export const getNextNegotiationStep = async (terms: NegotiationTerms, history: ChatMessage[], language: string = 'en'): Promise<NegotiationResponse> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `As an AI agent negotiating for a farmer, generate the next response. Target price is ${terms.targetPrice}, lowest acceptable is ${terms.lowestPrices[0] || terms.targetPrice}. ${getLanguageInstruction(language)} Respond in JSON matching the schema. Crop: ${terms.crop}. Quantity: ${terms.quantity} ${terms.unit}. Currency: ${terms.currency}. History: ${JSON.stringify(history)}`,
-            config: { 
+            config: {
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.OBJECT,
@@ -552,47 +556,47 @@ export const getNextNegotiationStep = async (terms: NegotiationTerms, history: C
 };
 
 export const getCropYieldPrediction = async (request: CropYieldRequest, language: string = 'en'): Promise<CropYieldResponse> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Provide a detailed crop yield prediction for ${request.crop} in ${request.location}. Assume cultivation area: ${request.area} ${request.areaUnit}. Soil type: ${request.soilType}. Include historical yield trends and major influencing factors. ${getLanguageInstruction(language)}`,
-      config: { 
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            predictedYield: { type: Type.STRING, description: "Total predicted yield as a number range or value string" },
-            yieldUnit: { type: Type.STRING },
-            historicalYieldData: {
-                type: Type.ARRAY,
-                items: {
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `Provide a detailed crop yield prediction for ${request.crop} in ${request.location}. Assume cultivation area: ${request.area} ${request.areaUnit}. Soil type: ${request.soilType}. Include historical yield trends and major influencing factors. ${getLanguageInstruction(language)}`,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        year: { type: Type.INTEGER },
-                        yield: { type: Type.NUMBER }
+                        predictedYield: { type: Type.STRING, description: "Total predicted yield as a number range or value string" },
+                        yieldUnit: { type: Type.STRING },
+                        historicalYieldData: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    year: { type: Type.INTEGER },
+                                    yield: { type: Type.NUMBER }
+                                },
+                                required: ["year", "yield"]
+                            }
+                        },
+                        analysis: { type: Type.STRING },
+                        influencingFactors: {
+                            type: Type.OBJECT,
+                            properties: {
+                                positive: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                negative: { type: Type.ARRAY, items: { type: Type.STRING } }
+                            },
+                            required: ["positive", "negative"]
+                        },
+                        recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
                     },
-                    required: ["year", "yield"]
+                    required: ["predictedYield", "yieldUnit", "historicalYieldData", "analysis", "influencingFactors", "recommendations"]
                 }
             },
-            analysis: { type: Type.STRING },
-            influencingFactors: {
-                type: Type.OBJECT,
-                properties: {
-                    positive: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    negative: { type: Type.ARRAY, items: { type: Type.STRING } }
-                },
-                required: ["positive", "negative"]
-            },
-            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ["predictedYield", "yieldUnit", "historicalYieldData", "analysis", "influencingFactors", "recommendations"]
-        }
-      },
-    });
-    return JSON.parse(response.text || '{}') as CropYieldResponse;
-  } catch (error) {
-    return handleGeminiError(error, 'getting yield prediction');
-  }
+        });
+        return JSON.parse(response.text || '{}') as CropYieldResponse;
+    } catch (error) {
+        return handleGeminiError(error, 'getting yield prediction');
+    }
 };
 
 export const getPriceBrokerAnalysis = async (cropName: string, location: string, language: string = 'en'): Promise<PriceBrokerAnalysis> => {
@@ -605,7 +609,7 @@ export const getPriceBrokerAnalysis = async (cropName: string, location: string,
         const context = exaResults.results.map(r => `Source: ${r.title}\n${r.text}`).join('\n\n');
 
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Using this real-time web context: ${context}\n\nProvide Broker price analysis for ${cropName} in ${location}. ${getLanguageInstruction(language)} Respond in JSON.`,
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
@@ -619,7 +623,7 @@ export const getPriceBrokerAnalysis = async (cropName: string, location: string,
 export const getMicroclimateAnalysis = async (coords: { lat: number; lng: number }, weatherData: WeatherData, language: string = 'en'): Promise<MicroclimateAnalysis> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Microclimate division for farm at ${coords.lat}, ${coords.lng}. Weather: ${JSON.stringify(weatherData)}. ${getLanguageInstruction(language)} Respond in JSON.`,
             config: { responseMimeType: "application/json" },
         });
@@ -632,7 +636,7 @@ export const getMicroclimateAnalysis = async (coords: { lat: number; lng: number
 export const analyzeWeatherForAlerts = async (weatherData: WeatherData, language: string = 'en'): Promise<Omit<Alert, 'id' | 'uid' | 'status' | 'createdAt' | 'relatedView' | 'relatedEntityId'> | null> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Agricultural risk analysis for: ${JSON.stringify(weatherData)}.\n\n${getLanguageInstruction(language)} Respond strictly with JSON containing 'severity' and 'message' (in ${getLanguageName(language)}) fields if a significant alert should be raised, otherwise respond with {}. Do not include markdown formatting like \`\`\`json.`,
         });
         const data = JSON.parse(extractJson(response.text || '{}') || response.text || '{}');
@@ -645,7 +649,7 @@ export const analyzeWeatherForAlerts = async (weatherData: WeatherData, language
 export const analyzeMarketPredictionForAlerts = async (prediction: CropPricePrediction, language: string = 'en'): Promise<Omit<Alert, 'id' | 'uid' | 'status' | 'createdAt' | 'relatedView' | 'relatedEntityId'> | null> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Market risk analysis for: ${JSON.stringify(prediction)}.\n\n${getLanguageInstruction(language)} Respond strictly with JSON containing 'severity' and 'message' (in ${getLanguageName(language)}) fields if a significant alert should be raised, otherwise respond with {}. Do not include markdown formatting like \`\`\`json.`,
         });
         const data = JSON.parse(extractJson(response.text || '{}') || response.text || '{}');
@@ -657,23 +661,23 @@ export const analyzeMarketPredictionForAlerts = async (prediction: CropPricePred
 
 export const parseShoppingList = async (listContent: { text?: string; imageBase64?: string; mimeType?: string }): Promise<ParsedListItem[]> => {
     try {
-        const instructionText = listContent.text 
+        const instructionText = listContent.text
             ? "Extract list of grocery/produce items. If quantity or unit is not specified, default to 1 'unit'. Respond ONLY with a JSON array."
             : "Extract list of grocery/produce items from the image. If quantity or unit is not specified, default to 1 'unit'. Respond ONLY with a JSON array.";
 
         const contentParts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = [];
-        
+
         if (listContent.text) {
             contentParts.push({ text: listContent.text });
         } else if (listContent.imageBase64 && listContent.mimeType) {
             contentParts.push({ inlineData: { data: listContent.imageBase64, mimeType: listContent.mimeType } });
         }
         contentParts.push({ text: instructionText });
-            
+
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: { role: 'user', parts: contentParts },
-            config: { 
+            config: {
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.ARRAY,
@@ -699,7 +703,7 @@ export const parseShoppingList = async (listContent: { text?: string; imageBase6
 export const curateDynamicBox = async (preferences: DynamicSubscriptionPreferences, availableProduce: WeeklyProduceItem[], tier: CSATier): Promise<CuratedItem[]> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Curate box for tier ${tier.name} (${tier.price} ${tier.currency}). Preferences: ${JSON.stringify(preferences)}. Availability: ${JSON.stringify(availableProduce)}. JSON array.`,
             config: { responseMimeType: "application/json" },
         });
@@ -713,7 +717,7 @@ export const curateDynamicBox = async (preferences: DynamicSubscriptionPreferenc
 export const getIrrigationRecommendation = async (zone: Zone, weather: WeatherData, language: string = 'en'): Promise<string> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Irrigation tip for ${zone.crop} at ${zone.soilMoisture}% moisture. Weather: ${JSON.stringify(weather)}. ${getLanguageInstruction(language)} Concise.`,
         });
         return (response.text || '').trim();
@@ -725,7 +729,7 @@ export const getIrrigationRecommendation = async (zone: Zone, weather: WeatherDa
 export const parseUserCommand = async (command: string): Promise<ParsedCommand> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Parse user intent: "${command}". JSON with action and parameters.`,
             config: { responseMimeType: "application/json" }
         });

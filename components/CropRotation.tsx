@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { getProfitForecast } from '../services/geminiService';
+import { fetchProfitForecast } from '../services/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import type { ProfitForecastRequest, ProfitForecastResponse } from '../types';
 import Icon from './common/Icon';
@@ -61,7 +61,7 @@ const ProfitForecaster: React.FC = () => {
         setError(null);
         setForecast(null);
         try {
-            const data = await getProfitForecast(request);
+            const data = await fetchProfitForecast(request);
             setForecast(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An unknown error occurred.');

@@ -6,21 +6,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import Exa from "exa-js";
 import type {
-  PlantingRequest, PlantingRecommendationResponse,
-  CropPricePrediction, WebSource,
-  CropYieldRequest, CropYieldResponse,
-  PriceBrokerAnalysis, Alert,
-  ProfitForecastRequest, ProfitForecastResponse,
-  IndianAgriNewsResponse
+    PlantingRequest, PlantingRecommendationResponse,
+    CropPricePrediction, WebSource,
+    CropYieldRequest, CropYieldResponse,
+    PriceBrokerAnalysis, Alert,
+    ProfitForecastRequest, ProfitForecastResponse,
+    IndianAgriNewsResponse
 } from '../types';
 import { TTLCache } from './retryUtils';
 import { extractJson, getLanguageInstruction } from './weatherService';
 
 if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
+    throw new Error("API_KEY environment variable is not set");
 }
 if (!process.env.EXA_API_KEY) {
-  throw new Error("EXA_API_KEY environment variable is not set");
+    throw new Error("EXA_API_KEY environment variable is not set");
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -36,7 +36,7 @@ const handleGeminiError = (error: unknown, context: string): never => {
     if (error instanceof Error && (error.message.includes('429') || error.message.toUpperCase().includes('RESOURCE_EXHAUSTED'))) {
         throw new Error("API request limit reached. Please try again in a few minutes.");
     }
-     if (error instanceof SyntaxError) {
+    if (error instanceof SyntaxError) {
         throw new Error("Failed to parse the data from the AI. The format was unexpected.");
     }
     throw new Error(`An AI error occurred while ${context}.`);
@@ -48,9 +48,9 @@ export const getPlantingRecommendations = async (request: PlantingRequest, langu
     try {
         const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Today is ${currentDate}. Provide planting recommendations for ${request.cropType} in ${request.location} considering soil type ${request.soilType}. Previous crop: ${request.previousCrop || 'None'}. Determine the current growing season (like Zaid/Summer, Kharif, or Rabi) based on this date and location. ${getLanguageInstruction(language)}`,
-            config: { 
+            config: {
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.OBJECT,
@@ -97,7 +97,7 @@ export const getMarketPricePrediction = async (cropName: string, location: strin
         const context = exaResults.results.map((r) => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
 
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Using this real-time web context: ${context}\n\nProvide Market price prediction for ${cropName} in ${location}. ${getLanguageInstruction(language)} Respond STRICTLY with a valid JSON object matching this schema, no markdown or conversational text:
 {
   "cropName": "${cropName}",
@@ -137,7 +137,7 @@ export const getProfitForecast = async (request: ProfitForecastRequest, language
         const context = exaResults.results.map((r) => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
 
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Using this real-time web context: ${context}\n\nProvide Profit forecast for ${request.cropName} in ${request.location}. ${getLanguageInstruction(language)} Respond STRICTLY with a valid JSON object matching this schema, no markdown or conversational text:
 {
   "predictedMarketPrice": number,
@@ -162,47 +162,47 @@ export const getProfitForecast = async (request: ProfitForecastRequest, language
 // ─── Crop Yield Prediction ───────────────────────────────────────────────
 
 export const getCropYieldPrediction = async (request: CropYieldRequest, language: string = 'en'): Promise<CropYieldResponse> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Provide a detailed crop yield prediction for ${request.crop} in ${request.location}. Assume cultivation area: ${request.area} ${request.areaUnit}. Soil type: ${request.soilType}. Include historical yield trends and major influencing factors. ${getLanguageInstruction(language)}`,
-      config: { 
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            predictedYield: { type: Type.STRING, description: "Total predicted yield as a number range or value string" },
-            yieldUnit: { type: Type.STRING },
-            historicalYieldData: {
-                type: Type.ARRAY,
-                items: {
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `Provide a detailed crop yield prediction for ${request.crop} in ${request.location}. Assume cultivation area: ${request.area} ${request.areaUnit}. Soil type: ${request.soilType}. Include historical yield trends and major influencing factors. ${getLanguageInstruction(language)}`,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        year: { type: Type.INTEGER },
-                        yield: { type: Type.NUMBER }
+                        predictedYield: { type: Type.STRING, description: "Total predicted yield as a number range or value string" },
+                        yieldUnit: { type: Type.STRING },
+                        historicalYieldData: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    year: { type: Type.INTEGER },
+                                    yield: { type: Type.NUMBER }
+                                },
+                                required: ["year", "yield"]
+                            }
+                        },
+                        analysis: { type: Type.STRING },
+                        influencingFactors: {
+                            type: Type.OBJECT,
+                            properties: {
+                                positive: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                negative: { type: Type.ARRAY, items: { type: Type.STRING } }
+                            },
+                            required: ["positive", "negative"]
+                        },
+                        recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
                     },
-                    required: ["year", "yield"]
+                    required: ["predictedYield", "yieldUnit", "historicalYieldData", "analysis", "influencingFactors", "recommendations"]
                 }
             },
-            analysis: { type: Type.STRING },
-            influencingFactors: {
-                type: Type.OBJECT,
-                properties: {
-                    positive: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    negative: { type: Type.ARRAY, items: { type: Type.STRING } }
-                },
-                required: ["positive", "negative"]
-            },
-            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ["predictedYield", "yieldUnit", "historicalYieldData", "analysis", "influencingFactors", "recommendations"]
-        }
-      },
-    });
-    return JSON.parse(response.text || '{}') as CropYieldResponse;
-  } catch (error) {
-    return handleGeminiError(error, 'getting yield prediction');
-  }
+        });
+        return JSON.parse(response.text || '{}') as CropYieldResponse;
+    } catch (error) {
+        return handleGeminiError(error, 'getting yield prediction');
+    }
 };
 
 // ─── Price Broker Analysis ───────────────────────────────────────────────
@@ -217,7 +217,7 @@ export const getPriceBrokerAnalysis = async (cropName: string, location: string,
         const context = exaResults.results.map((r) => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
 
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Using this real-time web context: ${context}\n\nProvide Broker price analysis for ${cropName} in ${location}. ${getLanguageInstruction(language)} Respond in JSON.`,
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
@@ -233,7 +233,7 @@ export const getPriceBrokerAnalysis = async (cropName: string, location: string,
 export const analyzeMarketPredictionForAlerts = async (prediction: CropPricePrediction, language: string = 'en'): Promise<Omit<Alert, 'id' | 'uid' | 'status' | 'createdAt' | 'relatedView' | 'relatedEntityId'> | null> => {
     try {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Market risk analysis for: ${JSON.stringify(prediction)}.\n\n${getLanguageInstruction(language)} Respond strictly with JSON containing 'severity' and 'message' fields if a significant alert should be raised, otherwise respond with {}. Do not include markdown formatting like \`\`\`json.`,
         });
         const data = JSON.parse(extractJson(response.text || '{}') || response.text || '{}');
@@ -275,7 +275,7 @@ export const getIndianAgriNews = async (location?: string, topic?: string, timeF
             else if (timeFilter === '30d') daysToSub = 30;
             else if (timeFilter === '90d') daysToSub = 90;
             else if (timeFilter === '180d') daysToSub = 180;
-            
+
             if (daysToSub > 0) {
                 now.setDate(now.getDate() - daysToSub);
                 exaOptions.startPublishedDate = now.toISOString();
@@ -286,7 +286,7 @@ export const getIndianAgriNews = async (location?: string, topic?: string, timeF
         const context = exaResults.results.map((r: Record<string, unknown>) => `Source: ${(r.title as string) ?? 'Unknown'}\n${(r.text as string) ?? ''}`).join('\n\n');
 
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+            model: "gemini-3-flash-preview",
             contents: `Using this real-time news context: ${context}\n\nProvide Indian agri news for ${location || 'national'}${topic ? ` focused on ${topic}` : ''}. ${getLanguageInstruction(language)} You MUST extract and return up to 10 distinct news articles, exactly 5 related government schemes, and exactly 5 financial incentives. If the text does not contain enough specific schemes or incentives, use your knowledge base to fill out the remaining slots with highly relevant national or state-level agricultural schemes and incentives. Respond STRICTLY with a valid JSON object matching this schema, no markdown or conversational text:
 {
   "news": [{"title": string, "summary": string, "source": string, "url": string, "publishedDate": string}],
