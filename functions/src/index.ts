@@ -6,9 +6,9 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI } from '@google/genai';
-import Exa from 'exa-js';
-import * as cors from 'cors';
-import * as express from 'express';
+import { tavily } from '@tavily/core';
+import cors from 'cors';
+import express, { Request, Response, NextFunction } from 'express';
 import {
   validateRequired,
   validateLocation,
@@ -25,18 +25,18 @@ admin.initializeApp();
 
 // Initialize AI services with environment variables (secure!)
 const geminiApiKey = functions.config().gemini?.api_key || process.env.GEMINI_API_KEY;
-const exaApiKey = functions.config().exa?.api_key || process.env.EXA_API_KEY;
+const tavilyApiKey = functions.config().tavily?.api_key || process.env.TAVILY_API_KEY;
 
 if (!geminiApiKey) {
-  throw new Error('GEMINI_API_KEY not configured. Run: firebase functions:config:set gemini.api_key="YOUR_KEY"');
+  throw new Error('GEMINI_API_KEY not configured. Set GEMINI_API_KEY environment variable.');
 }
 
-if (!exaApiKey) {
-  throw new Error('EXA_API_KEY not configured. Run: firebase functions:config:set exa.api_key="YOUR_KEY"');
+if (!tavilyApiKey) {
+  throw new Error('TAVILY_API_KEY not configured. Set TAVILY_API_KEY environment variable.');
 }
 
 const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-const exa = new Exa(exaApiKey);
+const tavilyClient = tavily({ apiKey: tavilyApiKey });
 
 // CORS configuration - only allow your domains
 const corsOptions = {
@@ -55,7 +55,7 @@ app.use(express.json({ limit: '5mb' }));
 /**
  * Middleware to verify Firebase Auth token
  */
-const verifyAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+const verifyAuth = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader?.startsWith('Bearer ')) {
@@ -78,7 +78,7 @@ const verifyAuth = async (req: express.Request, res: express.Response, next: exp
 /**
  * Middleware to check rate limits
  */
-const rateLimitMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+const rateLimitMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const userId = (req as any).user?.uid || 'anonymous';
   const rateCheck = checkRateLimit(rateLimitMap, userId, 20); // 20 calls per minute
   
@@ -98,7 +98,7 @@ app.use(rateLimitMiddleware);
  * POST /api/detectCropDisease
  * Analyzes crop images for disease detection
  */
-app.post('/api/detectCropDisease', async (req, res) => {
+app.post('/api/detectCropDisease', async (req: Request, res: Response) => {
   try {
     const { imageBase64, mimeType, language = 'en' } = req.body;
     
@@ -141,7 +141,7 @@ app.post('/api/detectCropDisease', async (req, res) => {
  * POST /api/analyzeSoilHealth
  * Analyzes soil images for health assessment
  */
-app.post('/api/analyzeSoilHealth', async (req, res) => {
+app.post('/api/analyzeSoilHealth', async (req: Request, res: Response) => {
   try {
     const { imageBase64, mimeType, language = 'en' } = req.body;
     
@@ -182,9 +182,9 @@ app.post('/api/analyzeSoilHealth', async (req, res) => {
  * POST /api/getMarketPricePrediction
  * Gets market price predictions with web grounding (RAG)
  */
-app.post('/api/getMarketPricePrediction', async (req, res) => {
+app.post('/api/getMarketPricePrediction', async (req: Request, res: Response) => {
   try {
-    const { cropName, location, startDate, endDate, language = 'en' } = req.body;
+    const { cropName, location, language = 'en' } = req.body;
     
     // Sanitize inputs
     const sanitizedCrop = sanitizeInput(cropName);
@@ -201,17 +201,13 @@ app.post('/api/getMarketPricePrediction', async (req, res) => {
       return;
     }
     
-    // Use Exa for web-grounded search (RAG pattern)
-    const exaResults = await exa.searchAndContents(
+    // Use Tavily for web-grounded search (RAG pattern)
+    const searchResults = await tavilyClient.search(
       `Current market price prediction for ${sanitizedCrop} in ${sanitizedLocation}`,
-      {
-        type: 'auto',
-        numResults: 3,
-        text: { maxCharacters: 5000 }
-      }
+      { searchDepth: 'advanced', maxResults: 5 }
     );
     
-    const context = exaResults.results.map(r => `Source: ${r.title}\n${r.text}`).join('\n\n');
+    const context = searchResults.results.map((r: any) => `Source: ${r.title}\n${r.content}`).join('\n\n');
     
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -234,7 +230,7 @@ app.post('/api/getMarketPricePrediction', async (req, res) => {
  * POST /api/getPlantingRecommendations
  * Gets AI-powered planting recommendations
  */
-app.post('/api/getPlantingRecommendations', async (req, res) => {
+app.post('/api/getPlantingRecommendations', async (req: Request, res: Response) => {
   try {
     const { location, soilType, cropType, previousCrop, language = 'en' } = req.body;
     
@@ -271,7 +267,7 @@ app.post('/api/getPlantingRecommendations', async (req, res) => {
  * POST /api/getRecipes
  * Generates AI recipes from ingredients
  */
-app.post('/api/getRecipes', async (req, res) => {
+app.post('/api/getRecipes', async (req: Request, res: Response) => {
   try {
     const { ingredients, availableCrops, dietaryPrefs = [], recipeCount = 3, language = 'en' } = req.body;
     
@@ -306,7 +302,7 @@ app.post('/api/getRecipes', async (req, res) => {
  * POST /api/getIndianAgriNews
  * Gets Indian agriculture news, government schemes, and incentives
  */
-app.post('/api/getIndianAgriNews', async (req, res) => {
+app.post('/api/getIndianAgriNews', async (req: Request, res: Response) => {
   try {
     const { location, topic, timeFilter, language = 'en' } = req.body;
     
@@ -320,44 +316,13 @@ app.post('/api/getIndianAgriNews', async (req, res) => {
     const sanitizedTopic = topic ? sanitizeInput(topic) : '';
     const topicQuery = sanitizedTopic ? ` about ${sanitizedTopic}` : '';
     
-    // Build Exa search options
-    interface ExaSearchOptions {
-      category?: string;
-      type?: string;
-      numResults?: number;
-      text?: { maxCharacters: number };
-      startPublishedDate?: string;
-    }
-    
-    const exaOptions: ExaSearchOptions = {
-      category: 'news',
-      type: 'auto',
-      numResults: 25,
-      text: { maxCharacters: 5000 }
-    };
-    
-    if (timeFilter) {
-      const now = new Date();
-      let daysToSub = 0;
-      if (timeFilter === '1d') daysToSub = 1;
-      else if (timeFilter === '7d') daysToSub = 7;
-      else if (timeFilter === '30d') daysToSub = 30;
-      else if (timeFilter === '90d') daysToSub = 90;
-      else if (timeFilter === '180d') daysToSub = 180;
-      
-      if (daysToSub > 0) {
-        now.setDate(now.getDate() - daysToSub);
-        exaOptions.startPublishedDate = now.toISOString();
-      }
-    }
-    
-    // Use Exa for web search (server-side - no CORS issues!)
-    const exaResults = await exa.searchAndContents(
+    // Use Tavily for web search (server-side - no CORS issues!)
+    const searchResults = await tavilyClient.search(
       `Latest agriculture news ${sanitizedLocation}${topicQuery}`,
-      exaOptions as Parameters<typeof exa.searchAndContents>[1]
+      { searchDepth: 'advanced', maxResults: 10, topic: 'news' }
     );
     
-    const context = exaResults.results.map(r => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
+    const context = searchResults.results.map((r: any) => `Source: ${r.title ?? 'Unknown'}\n${r.content ?? ''}`).join('\n\n');
     
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -373,7 +338,7 @@ app.post('/api/getIndianAgriNews', async (req, res) => {
     });
     
     const parsed = JSON.parse(response.text || '{}');
-    const sources = exaResults.results.map(r => ({ uri: r.url, title: r.title ?? 'Source' }));
+    const sources = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title ?? 'Source' }));
     res.json({ ...parsed, sources });
     
   } catch (error) {
@@ -384,9 +349,9 @@ app.post('/api/getIndianAgriNews', async (req, res) => {
 
 /**
  * POST /api/getProfitForecast
- * Gets profit forecast with RAG from Exa
+ * Gets profit forecast with RAG from Tavily
  */
-app.post('/api/getProfitForecast', async (req, res) => {
+app.post('/api/getProfitForecast', async (req: Request, res: Response) => {
   try {
     const { cropName, location, language = 'en' } = req.body;
     
@@ -404,16 +369,12 @@ app.post('/api/getProfitForecast', async (req, res) => {
     const sanitizedCrop = sanitizeInput(cropName);
     const sanitizedLocation = sanitizeInput(location);
     
-    const exaResults = await exa.searchAndContents(
+    const searchResults = await tavilyClient.search(
       `Profit margin forecast, demand, and analysis for ${sanitizedCrop} in ${sanitizedLocation}`,
-      {
-        type: 'auto',
-        numResults: 3,
-        text: { maxCharacters: 5000 }
-      }
+      { searchDepth: 'advanced', maxResults: 5 }
     );
     
-    const context = exaResults.results.map(r => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
+    const context = searchResults.results.map((r: any) => `Source: ${r.title ?? 'Unknown'}\n${r.content ?? ''}`).join('\n\n');
     
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -433,7 +394,7 @@ app.post('/api/getProfitForecast', async (req, res) => {
     });
     
     const parsed = JSON.parse(response.text || '{}');
-    const sources = exaResults.results.map(r => ({ uri: r.url, title: r.title ?? 'Source' }));
+    const sources = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title ?? 'Source' }));
     res.json({ ...parsed, sources });
     
   } catch (error) {
@@ -444,9 +405,9 @@ app.post('/api/getProfitForecast', async (req, res) => {
 
 /**
  * POST /api/getPriceBrokerAnalysis
- * Gets price broker analysis with RAG from Exa
+ * Gets price broker analysis with RAG from Tavily
  */
-app.post('/api/getPriceBrokerAnalysis', async (req, res) => {
+app.post('/api/getPriceBrokerAnalysis', async (req: Request, res: Response) => {
   try {
     const { cropName, location, language = 'en' } = req.body;
     
@@ -464,16 +425,12 @@ app.post('/api/getPriceBrokerAnalysis', async (req, res) => {
     const sanitizedCrop = sanitizeInput(cropName);
     const sanitizedLocation = sanitizeInput(location);
     
-    const exaResults = await exa.searchAndContents(
+    const searchResults = await tavilyClient.search(
       `Broker price analysis, trends, and demand for ${sanitizedCrop} in ${sanitizedLocation}`,
-      {
-        type: 'auto',
-        numResults: 3,
-        text: { maxCharacters: 5000 }
-      }
+      { searchDepth: 'advanced', maxResults: 5 }
     );
     
-    const context = exaResults.results.map(r => `Source: ${r.title ?? 'Unknown'}\n${r.text ?? ''}`).join('\n\n');
+    const context = searchResults.results.map((r: any) => `Source: ${r.title ?? 'Unknown'}\n${r.content ?? ''}`).join('\n\n');
     
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -484,7 +441,7 @@ app.post('/api/getPriceBrokerAnalysis', async (req, res) => {
     });
     
     const parsed = JSON.parse(response.text || '{}');
-    const sources = exaResults.results.map(r => ({ uri: r.url, title: r.title ?? 'Source' }));
+    const sources = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title ?? 'Source' }));
     res.json({ ...parsed, sources });
     
   } catch (error) {
@@ -496,7 +453,7 @@ app.post('/api/getPriceBrokerAnalysis', async (req, res) => {
 /**
  * Health check endpoint
  */
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -524,3 +481,5 @@ export const cleanupRateLimits = functions.pubsub
     
     console.log(`Cleaned up rate limits. Active users: ${rateLimitMap.size}`);
   });
+
+
