@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import Exa from "exa-js";
+import { tavily } from "@tavily/core";
 import { ActiveView } from '../types';
 import type { WeatherData, DiseaseReport, PlantingRecommendation, PlantingRequest, DiseaseHotspot, SoilHealthReport, PlantingRecommendationResponse, CropPricePrediction, WebSource, ChatMessage, NegotiationTerms, NegotiationResponse, CropYieldRequest, CropYieldResponse, PriceBrokerAnalysis, MicroclimateAnalysis, Alert, Livestock, LivestockHealthAnalysis, ProfitForecastRequest, ProfitForecastResponse, IndianAgriNewsResponse, RecipeResponse, ParsedListItem, ParsedCommand, DynamicSubscriptionPreferences, WeeklyProduceItem, CuratedItem, CSATier, FarmMachinery, MachineryRentalRequest, Zone, ProductListing } from '../types';
 
@@ -9,10 +9,10 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-if (!process.env.EXA_API_KEY) {
-    throw new Error("EXA_API_KEY environment variable is not set");
+if (!process.env.TAVILY_API_KEY) {
+    throw new Error("TAVILY_API_KEY environment variable is not set");
 }
-const exa = new Exa(process.env.EXA_API_KEY);
+const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
 
 const diseaseReportCache = new Map<string, DiseaseReport>();
 const soilHealthCache = new Map<string, SoilHealthReport>();
@@ -390,12 +390,11 @@ export const getPlantingRecommendations = async (request: PlantingRequest, langu
 
 export const getMarketPricePrediction = async (cropName: string, location: string, startDate: string, endDate: string, language: string = 'en'): Promise<CropPricePrediction> => {
     try {
-        const exaResults = await exa.searchAndContents(`Current market price prediction and trends for ${cropName} in ${location} ${startDate} to ${endDate}`, {
-            type: "auto",
-            numResults: 3,
-            text: { maxCharacters: 5000 }
+        const searchResults = await tavilyClient.search(`Current market price prediction and trends for ${cropName} in ${location} ${startDate} to ${endDate}`, {
+            searchDepth: "advanced",
+            maxResults: 5
         });
-        const context = exaResults.results.map(r => `Source: ${r.title}\n${r.text}`).join('\n\n');
+        const context = searchResults.results.map((r: any) => `Source: ${r.title}\n${r.content}`).join('\n\n');
 
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
@@ -413,7 +412,7 @@ export const getMarketPricePrediction = async (cropName: string, location: strin
 }`,
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
-        const sources: WebSource[] = exaResults.results.map(r => ({ uri: r.url, title: r.title || 'Source' }));
+        const sources: WebSource[] = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title || 'Source' }));
         return { ...parsed, sources };
     } catch (error) {
         return handleGeminiError(error, 'getting market price prediction');
@@ -422,12 +421,11 @@ export const getMarketPricePrediction = async (cropName: string, location: strin
 
 export const getProfitForecast = async (request: ProfitForecastRequest, language: string = 'en'): Promise<ProfitForecastResponse> => {
     try {
-        const exaResults = await exa.searchAndContents(`Profit margin forecast, demand, and analysis for ${request.cropName} in ${request.location}`, {
-            type: "auto",
-            numResults: 3,
-            text: { maxCharacters: 5000 }
+        const searchResults = await tavilyClient.search(`Profit margin forecast, demand, and analysis for ${request.cropName} in ${request.location}`, {
+            searchDepth: "advanced",
+            maxResults: 5
         });
-        const context = exaResults.results.map(r => `Source: ${r.title}\n${r.text}`).join('\n\n');
+        const context = searchResults.results.map((r: any) => `Source: ${r.title}\n${r.content}`).join('\n\n');
 
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
@@ -443,7 +441,7 @@ export const getProfitForecast = async (request: ProfitForecastRequest, language
 }`,
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
-        const sources: WebSource[] = exaResults.results.map(r => ({ uri: r.url, title: r.title || 'Source' }));
+        const sources: WebSource[] = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title || 'Source' }));
         return { ...parsed, sources };
     } catch (error) {
         return handleGeminiError(error, `getting profit forecast`);
@@ -453,30 +451,13 @@ export const getProfitForecast = async (request: ProfitForecastRequest, language
 export const getIndianAgriNews = async (location?: string, topic?: string, timeFilter?: string, language: string = 'en'): Promise<IndianAgriNewsResponse> => {
     try {
         const topicQuery = topic ? ` about ${topic}` : '';
-        const exaOptions: any = {
-            category: "news",
-            type: "auto",
-            numResults: 25,
-            text: { maxCharacters: 5000 }
-        };
 
-        if (timeFilter) {
-            const now = new Date();
-            let daysToSub = 0;
-            if (timeFilter === '1d') daysToSub = 1;
-            else if (timeFilter === '7d') daysToSub = 7;
-            else if (timeFilter === '30d') daysToSub = 30;
-            else if (timeFilter === '90d') daysToSub = 90;
-            else if (timeFilter === '180d') daysToSub = 180;
-
-            if (daysToSub > 0) {
-                now.setDate(now.getDate() - daysToSub);
-                exaOptions.startPublishedDate = now.toISOString();
-            }
-        }
-
-        const exaResults = await exa.searchAndContents(`Latest agriculture news ${location || 'national'}${topicQuery}`, exaOptions);
-        const context = exaResults.results.map((r: any) => `Source: ${r.title}\n${r.text}`).join('\n\n');
+        const searchResults = await tavilyClient.search(`Latest agriculture news ${location || 'India'}${topicQuery}`, {
+            searchDepth: "advanced",
+            maxResults: 10,
+            topic: "news"
+        });
+        const context = searchResults.results.map((r: any) => `Source: ${r.title}\n${r.content}`).join('\n\n');
 
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
@@ -488,7 +469,7 @@ export const getIndianAgriNews = async (location?: string, topic?: string, timeF
 }`,
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
-        const sources: WebSource[] = exaResults.results.map(r => ({ uri: r.url, title: r.title || 'Source' }));
+        const sources: WebSource[] = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title || 'Source' }));
         return { ...parsed, sources };
     } catch (error) {
         return handleGeminiError(error, 'getting Indian agri news');
@@ -601,19 +582,18 @@ export const getCropYieldPrediction = async (request: CropYieldRequest, language
 
 export const getPriceBrokerAnalysis = async (cropName: string, location: string, language: string = 'en'): Promise<PriceBrokerAnalysis> => {
     try {
-        const exaResults = await exa.searchAndContents(`Broker price analysis, trends, and demand for ${cropName} in ${location}`, {
-            type: "auto",
-            numResults: 3,
-            text: { maxCharacters: 5000 }
+        const searchResults = await tavilyClient.search(`Broker price analysis, trends, and demand for ${cropName} in ${location}`, {
+            searchDepth: "advanced",
+            maxResults: 5
         });
-        const context = exaResults.results.map(r => `Source: ${r.title}\n${r.text}`).join('\n\n');
+        const context = searchResults.results.map((r: any) => `Source: ${r.title}\n${r.content}`).join('\n\n');
 
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: `Using this real-time web context: ${context}\n\nProvide Broker price analysis for ${cropName} in ${location}. ${getLanguageInstruction(language)} Respond in JSON.`,
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
-        const sources: WebSource[] = exaResults.results.map(r => ({ uri: r.url, title: r.title || 'Source' }));
+        const sources: WebSource[] = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title || 'Source' }));
         return { ...parsed, sources };
     } catch (error) {
         return handleGeminiError(error, `getting broker analysis`);
