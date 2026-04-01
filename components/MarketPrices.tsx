@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { fetchMarketPricePrediction } from '../services/apiClient';
-import { analyzeMarketPredictionForAlerts } from '../services/geminiService';
+import { getMarketPricePrediction, analyzeMarketPredictionForAlerts } from '../services/geminiService';
 import { createAlert } from '../services/alertService';
 import { useAuth } from '../contexts/AuthContext';
 import { onCustomAlertsSnapshot } from '../services/customAlertService';
@@ -167,7 +166,7 @@ const MarketPrices: React.FC<MarketPricesProps> = () => {
     setActiveAlert(null);
     setAlertMessage(null);
     try {
-      const data = await fetchMarketPricePrediction(crop, location, startDate, endDate, language);
+      const data = await getMarketPricePrediction(crop, location, startDate, endDate, language);
       setPrediction(data);
        // Automatic AI alert analysis
        if (currentUser) {
