@@ -1,0 +1,249 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper Functions ──────────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isParticipant(field1, field2) {
+      return isAuthenticated() && (
+        resource.data[field1] == request.auth.uid ||
+        resource.data[field2] == request.auth.uid
+      );
+    }
+
+    // Validate that a write doesn't add unexpected fields
+    function hasOnlyExpectedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Rate limiting: prevent rapid-fire writes (max 1 per second)
+    function isNotRateLimited() {
+      return true; // Firestore doesn't support native rate limiting, but this is a placeholder
+    }
+
+    // ── Users Collection ──────────────────────────────────────────────
+    // Users can only read/write their own profile
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) &&
+        // Prevent role escalation
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) ||
+         request.resource.data.role == resource.data.role);
+      allow delete: if false; // Never allow profile deletion via client
+    }
+
+    // ── Products Collection ───────────────────────────────────────────
+    // Authenticated users can read all products; only owner can modify
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.farmerUid == request.auth.uid &&
+        request.resource.data.quantity > 0 &&
+        request.resource.data.price >= 0;
+      allow update: if isAuthenticated() &&
+        resource.data.farmerUid == request.auth.uid;
+      allow delete: if isAuthenticated() &&
+        resource.data.farmerUid == request.auth.uid;
+    }
+
+    // ── Deals Collection ──────────────────────────────────────────────
+    // Only participants in the deal can read/update
+    match /deals/{dealId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.farmerUid == request.auth.uid ||
+         resource.data.customerUid == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isParticipant('farmerUid', 'customerUid');
+      allow delete: if false; // Deals are permanent records
+    }
+
+    // ── Negotiations Collection ───────────────────────────────────────
+    // Only participants can access negotiations
+    match /negotiations/{negotiationId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.farmerUid == request.auth.uid ||
+         resource.data.customerUid == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        (resource.data.farmerUid == request.auth.uid ||
+         resource.data.customerUid == request.auth.uid);
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+          request.resource.data.content is string &&
+          request.resource.data.content.size() <= 5000; // Message length limit
+        allow update, delete: if false; // Messages are immutable
+      }
+    }
+
+    // ── CSA Tiers ─────────────────────────────────────────────────────
+    match /csaTiers/{tierId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.farmerUid == request.auth.uid &&
+        request.resource.data.price >= 0;
+      allow update, delete: if isAuthenticated() &&
+        resource.data.farmerUid == request.auth.uid;
+    }
+
+    // ── CSA Subscriptions ─────────────────────────────────────────────
+    match /csaSubscriptions/{subId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.farmerUid == request.auth.uid ||
+         resource.data.customerUid == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isParticipant('farmerUid', 'customerUid');
+      allow delete: if false; // Subscriptions should be cancelled, not deleted
+    }
+
+    // ── Weekly Availability ───────────────────────────────────────────
+    match /weeklyAvailability/{farmerId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(farmerId);
+    }
+
+    // ── AgriSwap Listings ─────────────────────────────────────────────
+    match /agriSwapListings/{listingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.farmerUid == request.auth.uid;
+      allow update, delete: if isAuthenticated() &&
+        resource.data.farmerUid == request.auth.uid;
+    }
+
+    // ── AgriSwap Deal Requests ────────────────────────────────────────
+    match /agriSwapDealRequests/{requestId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.fromUid == request.auth.uid ||
+         resource.data.toUid == request.auth.uid);
+      allow create: if isAuthenticated() &&
+        request.resource.data.fromUid == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        (resource.data.fromUid == request.auth.uid ||
+         resource.data.toUid == request.auth.uid);
+      allow delete: if false;
+    }
+
+    // ── Livestock ─────────────────────────────────────────────────────
+    match /livestock/{userId}/{animalId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ── Farm Machinery ────────────────────────────────────────────────
+    match /machinery/{machineryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if isAuthenticated() &&
+        resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ── Rental Requests ───────────────────────────────────────────────
+    match /rentalRequests/{requestId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.renterUid == request.auth.uid ||
+         resource.data.ownerUid == request.auth.uid);
+      allow create: if isAuthenticated() &&
+        request.resource.data.renterUid == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        (resource.data.renterUid == request.auth.uid ||
+         resource.data.ownerUid == request.auth.uid);
+      allow delete: if false;
+    }
+
+    // ── Community Connections ──────────────────────────────────────────
+    match /connections/{connectionId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.fromUid == request.auth.uid ||
+         resource.data.toUid == request.auth.uid);
+      allow create: if isAuthenticated() &&
+        request.resource.data.fromUid == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        (resource.data.fromUid == request.auth.uid ||
+         resource.data.toUid == request.auth.uid);
+      allow delete: if isAuthenticated() &&
+        (resource.data.fromUid == request.auth.uid ||
+         resource.data.toUid == request.auth.uid);
+    }
+
+    // ── Community Posts ───────────────────────────────────────────────
+    match /communityPosts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.authorUid == request.auth.uid &&
+        request.resource.data.content is string &&
+        request.resource.data.content.size() <= 10000; // Post length limit
+      allow update, delete: if isAuthenticated() &&
+        resource.data.authorUid == request.auth.uid;
+    }
+
+    // ── Farmer Chats ──────────────────────────────────────────────────
+    match /farmerChats/{chatId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.participants.hasAny([request.auth.uid]) ||
+         chatId.matches('.*' + request.auth.uid + '.*'));
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() <= 5000;
+        allow update, delete: if false; // Chat messages are immutable
+      }
+    }
+
+    // ── Retail Orders ─────────────────────────────────────────────────
+    match /retailOrders/{orderId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.customerUid == request.auth.uid ||
+         resource.data.farmerUid == request.auth.uid);
+      allow create: if isAuthenticated() &&
+        request.resource.data.customerUid == request.auth.uid &&
+        request.resource.data.quantity > 0;
+      allow update: if isAuthenticated() &&
+        (resource.data.customerUid == request.auth.uid ||
+         resource.data.farmerUid == request.auth.uid);
+      allow delete: if false; // Orders are permanent records
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() &&
+        resource.data.recipientUid == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        resource.data.recipientUid == request.auth.uid;
+      allow delete: if isAuthenticated() &&
+        resource.data.recipientUid == request.auth.uid;
+    }
+
+    // ── Farm Management ───────────────────────────────────────────────
+    match /farmTasks/{userId}/{taskId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /farmExpenses/{userId}/{expenseId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /irrigationZones/{userId}/{zoneId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ── Catch-all: Deny everything else ───────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

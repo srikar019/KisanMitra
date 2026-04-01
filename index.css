@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#F4F9F6] text-fc-dark-green antialiased;
+  }
+}
+
+.leaf-pattern {
+    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+    background-size: 20px 20px;
+    opacity: 0.4;
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.dashed-border {
+    background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='24' ry='24' stroke='%237DA68DFF' stroke-width='2' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+    border-radius: 24px;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #7DA68D;
+  border-radius: 10px;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Weather Forecast Button Styles */
+.forecast-btn {
+    @apply flex items-center justify-center px-8 py-3 rounded-lg font-bold text-white transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg disabled:opacity-50 disabled:grayscale;
+}
+.forecast-btn.sunny { @apply bg-gradient-to-r from-amber-400 to-orange-500 shadow-orange-100; }
+.forecast-btn.rain { @apply bg-gradient-to-r from-blue-400 to-indigo-600 shadow-blue-100; }
+.forecast-btn.cloudy { @apply bg-gradient-to-r from-slate-400 to-gray-600 shadow-gray-200; }
+.forecast-btn.snow { @apply bg-gradient-to-r from-blue-50 to-blue-200 !text-gray-800 shadow-blue-50; }
+.forecast-btn.thunder { @apply bg-gradient-to-r from-purple-600 to-indigo-900 shadow-purple-200; }
+.forecast-btn.monsoon { @apply bg-gradient-to-r from-teal-500 to-emerald-700 shadow-teal-100; }
+.forecast-btn.spring { @apply bg-gradient-to-r from-green-400 to-emerald-500 shadow-green-100; }
+.forecast-btn.autumn { @apply bg-gradient-to-r from-orange-600 to-red-700 shadow-red-100; }
+.forecast-btn.wind { @apply bg-gradient-to-r from-sky-300 to-blue-400 shadow-sky-100; }
+.forecast-btn.fog { @apply bg-gradient-to-r from-gray-300 to-slate-400 shadow-gray-100; }
+
+@keyframes pulse-icon {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.animate-pulse-icon {
+  animation: pulse-icon 1.5s infinite ease-in-out;
+}
+
+/* Toggle Switch Styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+}
+.switch .ch {
+  opacity: 0; width: 0; height: 0;
+}
+.switch .slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1; transition: .4s; border-radius: 34px;
+}
+.switch .slider:before {
+  position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px;
+  background-color: white; transition: .4s; border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.switch .ch:checked + .slider { background-color: #2D6A4F; }
+.switch .ch:checked + .slider:before { transform: translateX(24px); }
+.switch .ch:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+
+/* Specialized Seed Switch */
+.seed-switch {
+  position: relative;
+  display: inline-block;
+  width: 68px;
+  height: 34px;
+}
+.seed-switch input {
+  opacity: 0; width: 0; height: 0;
+}
+.seed-switch .slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #e2e8f0; transition: .4s; border-radius: 34px;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+}
+.seed-switch .slider:before {
+  position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px;
+  background-color: white; transition: .4s; border-radius: 50%;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); z-index: 10;
+}
+.seed-switch input:checked + .slider { background-color: #4ade80; }
+.seed-switch input:checked + .slider:before { transform: translateX(34px); }
+.seed-switch .seed, .seed-switch .plant { width: 18px; height: 18px; transition: .4s; pointer-events: none; }
+.seed-switch input:checked + .slider .plant { opacity: 1; }
+.seed-switch input:checked + .slider .seed { opacity: 0.3; }
+.seed-switch input:not(:checked) + .slider .seed { opacity: 1; }
+.seed-switch input:not(:checked) + .slider .plant { opacity: 0.3; }
+
+/* Ensure Leaflet map containers have a visible height */
+#map { height: 400px; width: 100%; z-index: 1; }

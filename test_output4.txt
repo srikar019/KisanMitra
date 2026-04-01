@@ -1,0 +1,36 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.2 [39m[90mC:/Users/SRIKAR/Downloads/copy-of-agrigenius-ai (1)[39m
+
+stderr | tests/retryUtils.test.ts > withRetry > should retry on transient failure and eventually succeed
+Retry attempt 1/3 after 8ms. Error: 429 Too Many Requests
+
+stderr | tests/retryUtils.test.ts > withRetry > should retry on transient failure and eventually succeed
+Retry attempt 2/3 after 16ms. Error: 429 Too Many Requests
+
+stderr | tests/retryUtils.test.ts > withRetry > should throw after exhausting all retry attempts
+Retry attempt 1/2 after 9ms. Error: 429 Rate limited
+
+stderr | tests/retryUtils.test.ts > withRetry > should retry on network errors
+Retry attempt 1/3 after 10ms. Error: Failed to fetch
+
+stderr | tests/retryUtils.test.ts > withRetry > should respect custom shouldRetry function
+Retry attempt 1/3 after 10ms. Error: custom error
+
+ [32mΓ£ô[39m tests/toastContext.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+stderr | tests/retryUtils.test.ts > withRetry > should respect custom shouldRetry function
+Retry attempt 2/3 after 16ms. Error: custom error
+
+ [32mΓ£ô[39m tests/validationService.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 133[2mms[22m[39m
+ [32mΓ£ô[39m tests/safeHtmlSkeleton.test.tsx [2m([22m[2m17 tests[22m[2m)[22m[32m 134[2mms[22m[39m
+ [32mΓ£ô[39m tests/components.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 251[2mms[22m[39m
+ [32mΓ£ô[39m tests/languageContext.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 97[2mms[22m[39m
+ [32mΓ£ô[39m tests/retryUtils.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 249[2mms[22m[39m
+ [32mΓ£ô[39m tests/comprehensive.test.tsx [2m([22m[2m55 tests[22m[2m)[22m[33m 621[2mms[22m[39m
+ [32mΓ£ô[39m tests/services.test.tsx [2m([22m[2m16 tests[22m[2m)[22m[33m 643[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should validate email format before attempting login [33m 565[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m155 passed[39m[22m[90m (155)[39m
+[2m   Start at [22m 06:05:22
+[2m   Duration [22m 3.63s[2m (transform 1.34s, setup 3.68s, import 1.35s, tests 2.19s, environment 15.66s)[22m
+

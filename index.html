@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta name="description" content="KisanMitra — India's smartest farm-to-table platform. AI-powered weather forecasting, crop disease detection, market price predictions, and direct marketplace connecting farmers to customers."/>
+    <meta name="keywords" content="agriculture, AI farming, crop disease detection, market prices, farm marketplace, CSA, agri-tech, Indian agriculture, KisanMitra"/>
+    <meta name="author" content="KisanMitra"/>
+    <meta name="theme-color" content="#2D6A4F"/>
+    
+    <!-- Content Security Policy — hardened (no unsafe-eval) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://api.exa.ai https://generativelanguage.googleapis.com https://api.open-meteo.com wss://*.firebaseio.com; frame-src https://*.firebaseapp.com https://accounts.google.com;"/>
+    
+    <!-- Open Graph / Social -->
+    <meta property="og:type" content="website"/>
+    <meta property="og:title" content="KisanMitra — Smart Agriculture Platform"/>
+    <meta property="og:description" content="AI-powered farming intelligence: weather forecasts, disease detection, market predictions & direct farm-to-customer marketplace."/>
+    <meta property="og:site_name" content="KisanMitra"/>
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image"/>
+    <meta name="twitter:title" content="KisanMitra — Smart Agriculture Platform"/>
+    <meta name="twitter:description" content="AI-powered farming intelligence: weather, disease detection, market predictions & marketplace."/>
+    
+    <!-- Performance: preconnect first, then dns-prefetch as fallback -->
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/>
+    <link rel="dns-prefetch" href="https://unpkg.com"/>
+    
+    <title>KisanMitra — Smart Agriculture Platform</title>
+    
+    <!-- Leaflet Maps CSS (render-blocking CSS is OK — avoids FOUC) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Google Fonts — optimized with preconnect + display=swap -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=Caveat:wght@400;700&family=Epilogue:wght@400;500;600;700;800&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <!-- FontAwesome — deferred loading (non-critical CSS) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" media="print" onload="this.media='all'"/>
+    <noscript><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/></noscript>
+
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="stylesheet" href="/index.css">
+</head>
+<body class="min-h-screen flex flex-col relative overflow-x-hidden">
+    <div class="leaf-pattern"></div>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+    <!-- Leaflet JS — deferred (only needed when map component mounts) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+</body>
+</html>

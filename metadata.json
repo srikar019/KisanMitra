@@ -1,0 +1,9 @@
+{
+  "name": "KisanMitra",
+  "description": "KisanMitra — Your trusted farming companion. A comprehensive AI-powered agricultural management system featuring weather forecasts, crop disease detection, and planting recommendations to help farmers make informed decisions.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

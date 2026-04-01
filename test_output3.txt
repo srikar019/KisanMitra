@@ -1,0 +1,77 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.2 [39m[90mC:/Users/SRIKAR/Downloads/copy-of-agrigenius-ai (1)[39m
+
+stderr | tests/retryUtils.test.ts > withRetry > should retry on transient failure and eventually succeed
+Retry attempt 1/3 after 8ms. Error: 429 Too Many Requests
+
+stderr | tests/retryUtils.test.ts > withRetry > should retry on transient failure and eventually succeed
+Retry attempt 2/3 after 18ms. Error: 429 Too Many Requests
+
+stderr | tests/retryUtils.test.ts > withRetry > should throw after exhausting all retry attempts
+Retry attempt 1/2 after 8ms. Error: 429 Rate limited
+
+stderr | tests/retryUtils.test.ts > withRetry > should retry on network errors
+Retry attempt 1/3 after 11ms. Error: Failed to fetch
+
+ [32mΓ£ô[39m tests/toastContext.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+stderr | tests/retryUtils.test.ts > withRetry > should respect custom shouldRetry function
+Retry attempt 1/3 after 7ms. Error: custom error
+
+stderr | tests/retryUtils.test.ts > withRetry > should respect custom shouldRetry function
+Retry attempt 2/3 after 18ms. Error: custom error
+
+ [32mΓ£ô[39m tests/validationService.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+ [32mΓ£ô[39m tests/safeHtmlSkeleton.test.tsx [2m([22m[2m17 tests[22m[2m)[22m[32m 128[2mms[22m[39m
+ [32mΓ£ô[39m tests/languageContext.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 94[2mms[22m[39m
+ [32mΓ£ô[39m tests/retryUtils.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 218[2mms[22m[39m
+ [32mΓ£ô[39m tests/components.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 239[2mms[22m[39m
+ [32mΓ£ô[39m tests/comprehensive.test.tsx [2m([22m[2m55 tests[22m[2m)[22m[33m 632[2mms[22m[39m
+ [31mΓ¥»[39m tests/services.test.tsx [2m([22m[2m16 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 662[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should validate email format before attempting login [33m 579[2mms[22m[39m
+       [32mΓ£ô[39m should validate that password is not empty[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should validate email format on signup[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should extract JSON from markdown code block[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle plain JSON without code blocks[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should handle code blocks without json specifier[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should handle nested JSON objects[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return Hindi instruction for hi[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return Telugu instruction for te[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return empty string for English[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return empty string for unknown languages[32m 0[2mms[22m[39m
+     [32mΓ£ô[39m should render children when no error[32m 40[2mms[22m[39m
+[31m     [31m├ù[31m should catch errors and display fallback[39m[32m 31[2mms[22m[39m
+     [32mΓ£ô[39m should provide theme context with default value[32m 2[2mms[22m[39m
+     [32mΓ£ô[39m should export ActiveView enum with all expected values[32m 1[2mms[22m[39m
+     [32mΓ£ô[39m should have unique enum values[32m 0[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/services.test.tsx > ErrorBoundary Integration > should catch errors and display fallback
+AssertionError: expected <p class="text-red-600 text-sm mb-4"></p> to be falsy
+
+- Expected:
+false
+
++ Received:
+<p
+  class="text-red-600 text-sm mb-4"
+>
+  Test error
+</p>
+
+ Γ¥» tests/services.test.tsx:170:46
+    168|
+    169|     // Should render error fallback UI
+    170|     expect(screen.queryByText('Test error')).toBeFalsy();
+       |                                              ^
+    171|     consoleSpy.mockRestore();
+    172|   });
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m7 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m154 passed[39m[22m[90m (155)[39m
+[2m   Start at [22m 06:04:20
+[2m   Duration [22m 3.75s[2m (transform 1.31s, setup 3.73s, import 1.44s, tests 2.16s, environment 16.17s)[22m
+
