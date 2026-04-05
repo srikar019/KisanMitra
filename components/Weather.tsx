@@ -184,7 +184,7 @@ const Weather: React.FC<WeatherProps> = () => {
   }, []);
 
   const updateMarkers = useCallback(() => {
-    if (!coordinates || !leafletMapRef.current) return;
+    if (!coordinates || !leafletMapRef.current || typeof L === 'undefined') return;
 
     leafletMarkersRef.current.forEach(marker => marker.removeFrom(leafletMapRef.current));
     leafletMarkersRef.current = [];
@@ -211,6 +211,8 @@ const Weather: React.FC<WeatherProps> = () => {
 }, [coordinates, weatherData, displayLocation, microclimateData]);
 
 useEffect(() => {
+    if (typeof L === 'undefined') return;
+    
     // Initialize map
     if (coordinates && mapContainerRef.current && !leafletMapRef.current) {
         const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });

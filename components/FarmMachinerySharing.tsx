@@ -165,6 +165,8 @@ export const FarmMachinerySharing: React.FC = () => {
     }, [allListings, currentUser, userCoords]);
 
     useEffect(() => {
+        if (typeof L === 'undefined') return;
+
         // This effect now correctly handles map creation and destruction
         if (browseView === 'map' && userCoords && mapContainerRef.current) {
             if (!mapRef.current) { // Only create if it doesn't exist yet
