@@ -10,6 +10,9 @@ import CustomerProfile from './CustomerProfile';
 import CustomerCSA from './CustomerCSA';
 import ShoppingListScanner from './ShoppingListScanner';
 import Icon from './common/Icon';
+import FreshnessIndicator from './common/FreshnessIndicator';
+import FarmerTrustBadge from './common/FarmerTrustBadge';
+import ProductPassportModal from './ProductPassportModal';
 
 interface CustomerPortalProps {
   onBack: () => void;
@@ -96,6 +99,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onBack, onStartN
   const [scanResults, setScanResults] = useState<{ found: ParsedListItem[], missing: ParsedListItem[] } | null>(null);
   const [marketplaceSearch, setMarketplaceSearch] = useState('');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [passportListing, setPassportListing] = useState<ProductListing | null>(null);
 
   useEffect(() => {
     const unsubscribe = onProductsSnapshot((listings) => {
@@ -272,7 +276,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onBack, onStartN
                                             AVAIL: {listing.quantity} {listing.unit}
                                         </span>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 mb-6">
+                                    <div className="flex flex-col gap-1.5 mb-3">
                                         <p className="text-sm text-gray-500 font-medium line-clamp-1 flex items-center gap-1.5">
                                             <Icon name="map-pin" className="h-4 w-4 text-gray-400 shrink-0" />
                                             {listing.location}
@@ -284,12 +288,23 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onBack, onStartN
                                             </p>
                                         )}
                                     </div>
+                                    <FreshnessIndicator createdAt={listing.createdAt} className="mb-3" />
+                                    <div className="flex items-center gap-1.5 mb-4">
+                                        <FarmerTrustBadge level="verified" size="sm" />
+                                    </div>
                                     
                                     <div className="mt-auto flex flex-col gap-2">
+                                        <button
+                                            onClick={() => setPassportListing(listing)}
+                                            className="w-full border border-[#2D6A4F]/20 text-[#2D6A4F] py-2.5 rounded-xl font-black text-xs transition-all hover:bg-[#2D6A4F]/5 active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">verified_user</span>
+                                            View Health Passport
+                                        </button>
                                         {listing.listingType === 'wholesale' ? (
                                             <button 
                                                 onClick={() => onStartNegotiation(listing, userProfile as FarmerProfile)}
-                                                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-3 rounded-xl font-black text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 mb-2"
+                                                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-3 rounded-xl font-black text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
                                             >
                                                 <Icon name="chat-bubble-left-right" className="h-4 w-4" /> Start AI Negotiation
                                             </button>
@@ -339,6 +354,16 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onBack, onStartN
                 <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">© 2024 KisanMitra. Sustainable. Fresh. Local.</p>
             </div>
         </footer>
+
+        {/* Trust System Modal */}
+        {passportListing && (
+            <ProductPassportModal
+                listing={passportListing}
+                isOpen={!!passportListing}
+                onClose={() => setPassportListing(null)}
+                onAddToCart={handleAddToCart}
+            />
+        )}
     </div>
   );
 };

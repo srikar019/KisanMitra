@@ -17,10 +17,13 @@
   },
   "dependencies": {
     "@google/genai": "^1.35.0",
+    "@gsap/react": "^2.1.2",
     "@tavily/core": "^0.7.2",
+    "@tensorflow/tfjs": "^4.22.0",
     "cors": "^2.8.6",
     "firebase": "^12.7.0",
     "framer-motion": "^12.25.0",
+    "gsap": "^3.15.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.13.2"

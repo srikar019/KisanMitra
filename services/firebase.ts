@@ -24,6 +24,15 @@ if (!firebase.apps.length) {
 const auth = firebase.auth();
 const firestore = firebase.firestore();
 
+// FORCE CLEAR in dev mode synchronously before any query can run
+if (import.meta.env.DEV) {
+  try {
+    firestore.clearPersistence().catch(() => {});
+  } catch (e) {
+    console.warn("Could not wipe persistence: ", e);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // OPTIMIZATION: Defer persistence to avoid blocking initial render
 // This saves 2-5 seconds on first load
@@ -33,6 +42,15 @@ let persistenceInitialized = false;
 const initPersistence = () => {
   if (persistenceInitialized) return;
   persistenceInitialized = true;
+
+  // Vite HMR causes multiple instances to hold onto IndexedDB, which causes 
+  // FIRESTORE (12.11.0) INTERNAL ASSERTION FAILED: Unexpected state (ID: ca9) CONTEXT: {"ve":-1}
+  // Disable persistence and forcefully wipe it so the user's browser is reset automatically.
+  if (import.meta.env.DEV) {
+    console.info('Firestore caching wiped and disabled in DEV to prevent HMR IndexedDB cache corruption.');
+    firestore.clearPersistence().catch(() => {});
+    return;
+  }
   
   firestore.enablePersistence({ synchronizeTabs: true })
     .catch((err) => {

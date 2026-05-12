@@ -1,14 +1,19 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { detectCropDisease, analyzeSoilHealth } from '../services/geminiService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSharedState } from '../contexts/SharedStateContext';
+import { useAuth } from '../contexts/AuthContext';
 import type { DiseaseReport, SoilHealthReport } from '../types';
 import Card from './common/Card';
 import Button from './common/Button';
 import Spinner from './common/Spinner';
 import Icon from './common/Icon';
+import { firestore } from '../services/firebase';
+import firebase from 'firebase/compat/app';
+import { predictDisease, isModelAvailable, loadModel, getModelStatus, type MLPrediction } from '../services/mlDiseaseService';
 
 type AnalysisMode = 'disease' | 'soil';
+type AIEngine = 'ml' | 'gemini';
 
 const parsePhValue = (phString: string): number => {
     if (!phString) return 7.0;
@@ -23,6 +28,7 @@ const parsePhValue = (phString: string): number => {
 
 const DiseaseDetection: React.FC = () => {
   const { translate, language } = useLanguage();
+  const { userProfile } = useAuth();
   const [analysisMode, setAnalysisMode] = useSharedState<AnalysisMode>('disease_mode', 'disease');
   const [imagePreview, setImagePreview] = useSharedState<string | null>('disease_preview', null);
   const [imageBase64, setImageBase64] = useSharedState<string | null>('disease_base64', null);
@@ -32,6 +38,28 @@ const DiseaseDetection: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  // ── ML Model State ──
+  const [aiEngine, setAiEngine] = useState<AIEngine>('ml');
+  const [mlPrediction, setMlPrediction] = useState<MLPrediction | null>(null);
+  const [mlModelAvailable, setMlModelAvailable] = useState<boolean>(false);
+  const [mlModelLoading, setMlModelLoading] = useState<boolean>(false);
+
+  // Check if ML model is available on mount
+  useEffect(() => {
+    isModelAvailable().then(available => {
+      setMlModelAvailable(available);
+      if (available) {
+        setMlModelLoading(true);
+        loadModel().then(() => setMlModelLoading(false)).catch(() => {
+          setMlModelLoading(false);
+          setMlModelAvailable(false);
+        });
+      } else {
+        setAiEngine('gemini'); // Fallback if model not deployed
+      }
+    });
+  }, []);
   const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +71,7 @@ const DiseaseDetection: React.FC = () => {
     setImageBase64(null);
     setDiseaseReport(null);
     setSoilReport(null);
+    setMlPrediction(null);
     setError(null);
   };
   
@@ -155,20 +184,70 @@ const DiseaseDetection: React.FC = () => {
     setError(null);
     setDiseaseReport(null);
     setSoilReport(null);
+    setMlPrediction(null);
     try {
         if(analysisMode === 'disease') {
-            const data = await detectCropDisease(imageBase64, mimeType, language);
-            setDiseaseReport(data);
+            if (aiEngine === 'ml' && mlModelAvailable) {
+                // ── ML Model Inference (in-browser CNN) ──
+                const prediction = await predictDisease(imageBase64, mimeType);
+                setMlPrediction(prediction);
+                // Also set diseaseReport for compatibility
+                setDiseaseReport({
+                    isHealthy: prediction.isHealthy,
+                    diseaseName: `${prediction.cropName} — ${prediction.diseaseName}`,
+                    description: prediction.description,
+                    treatment: prediction.treatment,
+                });
+                // Save to Firestore
+                if (userProfile?.uid) {
+                    firestore.collection('diseaseScans').add({
+                        farmerUid: userProfile.uid,
+                        isHealthy: prediction.isHealthy,
+                        diseaseName: prediction.diseaseName,
+                        description: prediction.description,
+                        confidence: prediction.confidence,
+                        engine: 'ml_model',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    }).catch(err => console.warn('Failed to save disease scan:', err));
+                }
+            } else {
+                // ── Gemini AI Inference ──
+                const data = await detectCropDisease(imageBase64, mimeType, language);
+                setDiseaseReport(data);
+                if (userProfile?.uid) {
+                    firestore.collection('diseaseScans').add({
+                        farmerUid: userProfile.uid,
+                        isHealthy: data.isHealthy,
+                        diseaseName: data.diseaseName || '',
+                        description: data.description || '',
+                        engine: 'gemini_ai',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    }).catch(err => console.warn('Failed to save disease scan:', err));
+                }
+            }
         } else {
             const data = await analyzeSoilHealth(imageBase64, mimeType, language);
             setSoilReport(data);
+            // ── Save to Firestore for Health Passport system ──
+            if (userProfile?.uid) {
+                firestore.collection('soilAnalyses').doc(userProfile.uid).set({
+                    farmerUid: userProfile.uid,
+                    soilType: data.soilType,
+                    texture: data.texture,
+                    phLevel: data.phLevel,
+                    organicMatter: data.organicMatter,
+                    nutrientAnalysis: data.nutrientAnalysis,
+                    recommendations: data.recommendations,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true }).catch(err => console.warn('Failed to save soil analysis:', err));
+            }
         }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setLoading(false);
     }
-  }, [imageBase64, mimeType, analysisMode, translate]);
+  }, [imageBase64, mimeType, analysisMode, translate, userProfile, aiEngine, mlModelAvailable]);
 
   const triggerFileSelect = () => fileInputRef.current?.click();
 
@@ -240,6 +319,49 @@ const DiseaseDetection: React.FC = () => {
         </div>
       )}
 
+      {/* AI Engine Toggle (only for disease mode) */}
+      {isDiseaseMode && (
+        <div className="mb-4">
+          <div className="flex items-center justify-center space-x-2 bg-gray-100 p-1 rounded-full max-w-md mx-auto">
+            <button
+              onClick={() => setAiEngine('ml')}
+              disabled={loading || !mlModelAvailable}
+              className={`flex-1 px-4 py-2 text-xs font-semibold rounded-full transition-colors duration-300 flex items-center justify-center gap-1.5 ${
+                aiEngine === 'ml'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-gray-500 hover:bg-gray-200'
+              } ${!mlModelAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <Icon name="cpu-chip" className="w-3.5 h-3.5" />
+              ML Model (CNN)
+              {mlModelLoading && <Spinner />}
+            </button>
+            <button
+              onClick={() => setAiEngine('gemini')}
+              disabled={loading}
+              className={`flex-1 px-4 py-2 text-xs font-semibold rounded-full transition-colors duration-300 flex items-center justify-center gap-1.5 ${
+                aiEngine === 'gemini'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              <Icon name="sparkles" className="w-3.5 h-3.5" />
+              Gemini AI
+            </button>
+          </div>
+          {aiEngine === 'ml' && mlModelAvailable && (
+            <p className="text-xs text-center text-indigo-600 mt-2 font-medium">
+              🧠 Using trained MobileNetV2 CNN — PlantVillage Dataset (38 classes)
+            </p>
+          )}
+          {!mlModelAvailable && (
+            <p className="text-xs text-center text-amber-600 mt-2">
+              ML model not deployed yet. Using Gemini AI. Run the training pipeline to enable.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="text-center mb-6">
         <Button onClick={handleAnalysis} disabled={loading || !imagePreview || isCameraOpen} className="w-full sm:w-auto">
           {loading ? <Spinner /> : isDiseaseMode ? translate('disease.button.analyze.plant') : translate('disease.button.analyze.soil')}
@@ -251,6 +373,57 @@ const DiseaseDetection: React.FC = () => {
       {diseaseReport && isDiseaseMode && (
         <div className="animate-fade-in space-y-4">
           <h3 className="text-xl font-semibold text-gray-700">{translate('disease.report.plant.title')}</h3>
+
+          {/* ML Model Confidence & Top Predictions */}
+          {mlPrediction && aiEngine === 'ml' && (
+            <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Icon name="cpu-chip" className="w-4 h-4" /> ML Model Prediction
+                </span>
+                <span className="text-xs text-gray-500">
+                  ⚡ {mlPrediction.inferenceTimeMs}ms inference
+                </span>
+              </div>
+              {/* Confidence Bar */}
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-semibold text-gray-800">{mlPrediction.cropName} — {mlPrediction.diseaseName}</span>
+                  <span className={`font-bold ${mlPrediction.confidence > 0.8 ? 'text-green-600' : mlPrediction.confidence > 0.5 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {(mlPrediction.confidence * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div
+                    className={`h-2.5 rounded-full transition-all duration-500 ${
+                      mlPrediction.confidence > 0.8 ? 'bg-green-500' : mlPrediction.confidence > 0.5 ? 'bg-amber-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${mlPrediction.confidence * 100}%` }}
+                  />
+                </div>
+              </div>
+              {/* Top-5 Predictions */}
+              <div>
+                <h5 className="text-xs font-semibold text-gray-600 mb-2">Top 5 Predictions</h5>
+                <div className="space-y-1">
+                  {mlPrediction.topPredictions.map((pred, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="w-4 text-gray-400 font-mono">#{i + 1}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                        <div className="bg-indigo-400 h-1.5 rounded-full" style={{ width: `${pred.confidence * 100}%` }} />
+                      </div>
+                      <span className="text-gray-700 min-w-[120px] truncate">{pred.cropName} — {pred.diseaseName}</span>
+                      <span className="text-gray-500 font-mono w-12 text-right">{(pred.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-indigo-600 border-t border-indigo-100 pt-2">
+                Severity: <span className="font-bold capitalize">{mlPrediction.severity}</span>
+              </p>
+            </div>
+          )}
+
           {diseaseReport.isHealthy ? (
             <div className="p-4 rounded-lg bg-green-100 text-green-800 border border-green-200 flex items-center">
                 <Icon name="check-circle" className="h-6 w-6 mr-3"/>

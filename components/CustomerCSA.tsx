@@ -20,8 +20,8 @@ const CustomerCSA: React.FC = () => {
     useEffect(() => {
         const unsubTiers = onAllCSATiersSnapshot(setTiers);
         let unsubMySubs = () => {};
-        if (currentUser?.email) {
-            unsubMySubs = onCSASubscriptionsForCustomerSnapshot(currentUser.email, setMySubscriptions);
+        if (currentUser?.uid) {
+            unsubMySubs = onCSASubscriptionsForCustomerSnapshot(currentUser.uid, setMySubscriptions);
         }
         setLoading(false);
         return () => { unsubTiers(); unsubMySubs(); };

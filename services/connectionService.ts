@@ -8,8 +8,10 @@ export const sendConnectionRequest = async (sender: FarmerProfile, recipient: Fa
     if (sender.uid === recipient.uid) return;
 
     // Check if a request already exists between these two users
+    // IMPORTANT: Query MUST strictly use array-contains with the sender's uid
+    // Otherwise, Firestore Security Rules will reject the query for trying to fetch documents the user isn't part of.
     const existingReqQuery = firestore.collection('connections')
-        .where('participantUids', 'array-contains-any', [sender.uid, recipient.uid]);
+        .where('participantUids', 'array-contains', sender.uid);
     
     const querySnapshot = await existingReqQuery.get();
     
@@ -17,7 +19,7 @@ export const sendConnectionRequest = async (sender: FarmerProfile, recipient: Fa
     const requestExists = querySnapshot.docs.some(doc => {
         const data = doc.data();
         const participants = data.participantUids as string[];
-        return participants.includes(sender.uid) && participants.includes(recipient.uid);
+        return participants.includes(recipient.uid);
     });
 
     if (requestExists) {
@@ -62,39 +64,51 @@ export const removeConnection = async (uid1: string, uid2: string): Promise<void
 };
 
 
-export const onPendingRequestsSnapshot = (userId: string, callback: (requests: ConnectionRequest[]) => void): () => void => {
+export const onPendingRequestsSnapshot = (userId: string, callback: (requests: ConnectionRequest[]) => void, onError?: (error: Error) => void): () => void => {
     const q = firestore.collection('connections')
         .where('recipientUid', '==', userId)
         .where('status', '==', 'pending')
         .orderBy('createdAt', 'desc');
 
-    return q.onSnapshot(snapshot => {
-        const requests = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                createdAt: data.createdAt?.toDate() || new Date(),
-            } as ConnectionRequest;
-        });
-        callback(requests);
-    });
+    return q.onSnapshot(
+        snapshot => {
+            const requests = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                } as ConnectionRequest;
+            });
+            callback(requests);
+        },
+        error => {
+            console.error("Error in pending requests snapshot:", error);
+            if (onError) onError(error);
+        }
+    );
 };
 
 
-export const onConnectionsSnapshot = (userId: string, callback: (connections: FarmerProfile[]) => void): () => void => {
+export const onConnectionsSnapshot = (userId: string, callback: (connections: FarmerProfile[]) => void, onError?: (error: Error) => void): () => void => {
     const q = firestore.collection('connections')
         .where('participantUids', 'array-contains', userId)
         .where('status', '==', 'accepted');
 
-    return q.onSnapshot(snapshot => {
-        const connections: FarmerProfile[] = snapshot.docs.map(doc => {
-            const data = doc.data();
-            // Return the profile of the *other* person in the connection
-            const otherUid = data.senderUid === userId ? data.recipientUid : data.senderUid;
-            const otherEmail = data.senderUid === userId ? data.recipientEmail : data.senderEmail;
-            return { uid: otherUid, email: otherEmail, role: 'farmer' };
-        });
-        callback(connections);
-    });
+    return q.onSnapshot(
+        snapshot => {
+            const connections: FarmerProfile[] = snapshot.docs.map(doc => {
+                const data = doc.data();
+                // Return the profile of the *other* person in the connection
+                const otherUid = data.senderUid === userId ? data.recipientUid : data.senderUid;
+                const otherEmail = data.senderUid === userId ? data.recipientEmail : data.senderEmail;
+                return { uid: otherUid, email: otherEmail, role: 'farmer' };
+            });
+            callback(connections);
+        },
+        error => {
+            console.error("Error in connections snapshot:", error);
+            if (onError) onError(error);
+        }
+    );
 };

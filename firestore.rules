@@ -23,27 +23,46 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly(fields);
     }
 
-    // Rate limiting: prevent rapid-fire writes (max 1 per second)
+    // Rate limiting: prevent rapid-fire writes (max 1 write per 2 seconds per document)
+    // Uses the document's own updatedAt timestamp when available
     function isNotRateLimited() {
-      return true; // Firestore doesn't support native rate limiting, but this is a placeholder
+      return !('updatedAt' in resource.data) ||
+        request.time > resource.data.updatedAt + duration.value(2, 's');
     }
 
     // ── Users Collection ──────────────────────────────────────────────
     // Users can only read/write their own profile
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) &&
-        // Prevent role escalation
+        // Prevent role escalation, but allow setting role if it doesn't exist yet
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) ||
+         !('role' in resource.data) ||
          request.resource.data.role == resource.data.role);
       allow delete: if false; // Never allow profile deletion via client
+
+      match /alerts/{alertId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      match /tasks/{taskId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /expenses/{expenseId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /irrigationZones/{zoneId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // ── Products Collection ───────────────────────────────────────────
     // Authenticated users can read all products; only owner can modify
     match /products/{productId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() &&
         request.resource.data.farmerUid == request.auth.uid &&
         request.resource.data.quantity > 0 &&
@@ -87,7 +106,7 @@ service cloud.firestore {
 
     // ── CSA Tiers ─────────────────────────────────────────────────────
     match /csaTiers/{tierId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() &&
         request.resource.data.farmerUid == request.auth.uid &&
         request.resource.data.price >= 0;
@@ -107,30 +126,39 @@ service cloud.firestore {
 
     // ── Weekly Availability ───────────────────────────────────────────
     match /weeklyAvailability/{farmerId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isOwner(farmerId);
     }
 
-    // ── AgriSwap Listings ─────────────────────────────────────────────
-    match /agriSwapListings/{listingId} {
-      allow read: if isAuthenticated();
+    // ── Barter Listings ─────────────────────────────────────────────
+    match /barterListings/{listingId} {
+      allow read: if true;
       allow create: if isAuthenticated() &&
         request.resource.data.farmerUid == request.auth.uid;
       allow update, delete: if isAuthenticated() &&
         resource.data.farmerUid == request.auth.uid;
     }
 
-    // ── AgriSwap Deal Requests ────────────────────────────────────────
-    match /agriSwapDealRequests/{requestId} {
+    // ── Barter Requests ─────────────────────────────────────────────
+    match /barterRequests/{requestId} {
       allow read: if isAuthenticated() &&
-        (resource.data.fromUid == request.auth.uid ||
-         resource.data.toUid == request.auth.uid);
+        (resource.data.requesterUid == request.auth.uid ||
+         resource.data.listerUid == request.auth.uid);
       allow create: if isAuthenticated() &&
-        request.resource.data.fromUid == request.auth.uid;
+        request.resource.data.requesterUid == request.auth.uid;
       allow update: if isAuthenticated() &&
-        (resource.data.fromUid == request.auth.uid ||
-         resource.data.toUid == request.auth.uid);
+        (resource.data.requesterUid == request.auth.uid ||
+         resource.data.listerUid == request.auth.uid);
       allow delete: if false;
+    }
+
+    // ── Finalized Barter Deals ──────────────────────────────────────
+    match /finalizedBarterDeals/{dealId} {
+      allow read: if isAuthenticated() &&
+        resource.data.recipientUid == request.auth.uid;
+      allow create: if isAuthenticated(); // Created transparently via transactions 
+      allow update: if isAuthenticated() &&
+        resource.data.recipientUid == request.auth.uid;
     }
 
     // ── Livestock ─────────────────────────────────────────────────────
@@ -139,8 +167,8 @@ service cloud.firestore {
     }
 
     // ── Farm Machinery ────────────────────────────────────────────────
-    match /machinery/{machineryId} {
-      allow read: if isAuthenticated();
+    match /machineryListings/{machineryId} {
+      allow read: if true;
       allow create: if isAuthenticated() &&
         request.resource.data.ownerUid == request.auth.uid;
       allow update, delete: if isAuthenticated() &&
@@ -148,7 +176,7 @@ service cloud.firestore {
     }
 
     // ── Rental Requests ───────────────────────────────────────────────
-    match /rentalRequests/{requestId} {
+    match /machineryRentals/{requestId} {
       allow read: if isAuthenticated() &&
         (resource.data.renterUid == request.auth.uid ||
          resource.data.ownerUid == request.auth.uid);
@@ -163,33 +191,34 @@ service cloud.firestore {
     // ── Community Connections ──────────────────────────────────────────
     match /connections/{connectionId} {
       allow read: if isAuthenticated() &&
-        (resource.data.fromUid == request.auth.uid ||
-         resource.data.toUid == request.auth.uid);
+        (request.auth.uid in resource.data.participantUids || 
+         resource.data.senderUid == request.auth.uid || 
+         resource.data.recipientUid == request.auth.uid);
       allow create: if isAuthenticated() &&
-        request.resource.data.fromUid == request.auth.uid;
+        request.resource.data.senderUid == request.auth.uid;
       allow update: if isAuthenticated() &&
-        (resource.data.fromUid == request.auth.uid ||
-         resource.data.toUid == request.auth.uid);
+        (request.auth.uid in resource.data.participantUids ||
+         resource.data.senderUid == request.auth.uid || 
+         resource.data.recipientUid == request.auth.uid);
       allow delete: if isAuthenticated() &&
-        (resource.data.fromUid == request.auth.uid ||
-         resource.data.toUid == request.auth.uid);
+        (request.auth.uid in resource.data.participantUids ||
+         resource.data.senderUid == request.auth.uid || 
+         resource.data.recipientUid == request.auth.uid);
     }
 
-    // ── Community Posts ───────────────────────────────────────────────
-    match /communityPosts/{postId} {
-      allow read: if isAuthenticated();
+    // ── Community Feed ────────────────────────────────────────────────
+    match /community_feed/{postId} {
+      allow read: if true;
       allow create: if isAuthenticated() &&
-        request.resource.data.authorUid == request.auth.uid &&
-        request.resource.data.content is string &&
-        request.resource.data.content.size() <= 10000; // Post length limit
+        request.resource.data.senderUid == request.auth.uid;
       allow update, delete: if isAuthenticated() &&
-        resource.data.authorUid == request.auth.uid;
+        resource.data.senderUid == request.auth.uid;
     }
 
-    // ── Farmer Chats ──────────────────────────────────────────────────
-    match /farmerChats/{chatId} {
+    // ── Chats ──────────────────────────────────────────────────
+    match /chats/{chatId} {
       allow read: if isAuthenticated() &&
-        (resource.data.participants.hasAny([request.auth.uid]) ||
+        (request.auth.uid in resource.data.participants ||
          chatId.matches('.*' + request.auth.uid + '.*'));
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
@@ -197,9 +226,10 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isAuthenticated();
         allow create: if isAuthenticated() &&
-          request.resource.data.text is string &&
-          request.resource.data.text.size() <= 5000;
-        allow update, delete: if false; // Chat messages are immutable
+          request.resource.data.text is string;
+        allow update: if isAuthenticated() && 
+          resource.data.senderUid == request.auth.uid; 
+        allow delete: if false; // Instead of delete, chatService sets deleted: true
       }
     }
 
@@ -229,16 +259,45 @@ service cloud.firestore {
     }
 
     // ── Farm Management ───────────────────────────────────────────────
-    match /farmTasks/{userId}/{taskId} {
-      allow read, write: if isOwner(userId);
+    // Note: Farm Management rules have been moved to the Users Collection block
+    // to correctly match the data structure (users/{userId}/tasks, etc.)
+
+    // ── Trust & Transparency System ─────────────────────────────────
+    match /farmerVerifications/{farmerUid} {
+      allow read: if true;
+      allow create, update: if isOwner(farmerUid);
+      allow delete: if false;
     }
 
-    match /farmExpenses/{userId}/{expenseId} {
-      allow read, write: if isOwner(userId);
+    match /productPassports/{listingId} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+        request.resource.data.farmerUid == request.auth.uid;
+      allow update, delete: if false; // Passports are immutable
     }
 
-    match /irrigationZones/{userId}/{zoneId} {
-      allow read, write: if isOwner(userId);
+    match /farmerReviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+        request.resource.data.customerUid == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        resource.data.customerUid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ── Disease Scans (saved from Crop Health Scanner) ────────────────
+    match /diseaseScans/{scanId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.farmerUid == request.auth.uid;
+      allow update, delete: if false; // Scan records are immutable
+    }
+
+    // ── Soil Analyses (saved from Soil Health Scanner) ────────────────
+    match /soilAnalyses/{farmerUid} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(farmerUid);
+      allow delete: if false;
     }
 
     // ── Catch-all: Deny everything else ───────────────────────────────

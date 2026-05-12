@@ -170,10 +170,15 @@ const CommunityPage: React.FC<CommunityPageProps> = ({ onStartChat }) => {
         const unsubSent = firestore.collection('connections')
             .where('senderUid', '==', currentUser.uid)
             .where('status', '==', 'pending')
-            .onSnapshot(snapshot => {
-                const sent = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ConnectionRequest));
-                setSentRequests(sent);
-            });
+            .onSnapshot(
+                snapshot => {
+                    const sent = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ConnectionRequest));
+                    setSentRequests(sent);
+                },
+                error => {
+                    console.error("Error in sent requests snapshot:", error);
+                }
+            );
 
         return () => {
             unsubConnections();
@@ -296,20 +301,19 @@ const CommunityPage: React.FC<CommunityPageProps> = ({ onStartChat }) => {
             })}
         </div>
     );
-    
     const renderContent = () => {
         const hasSearch = searchTerm.trim().length > 0;
 
-        // Updated filter logic: exclusively search by username (name).
-        // Emails and Gmail addresses are now ignored in the filter logic.
+        // Updated filter logic: search by username (name) or email prefix.
+        // If there is no search term, return an empty array (do not show farmers).
         const filteredFarmers = !hasSearch ? [] : allFarmers.filter(f => {
             if (f.uid === currentUser?.uid) return false;
             
             const searchLower = searchTerm.toLowerCase();
             const displayName = (f.name || '').toLowerCase();
+            const emailPrefix = (f.email || '').split('@')[0].toLowerCase();
             
-            // Only return farmers whose actual name (username) matches the search query.
-            return displayName.length > 0 && displayName.includes(searchLower);
+            return displayName.includes(searchLower) || emailPrefix.includes(searchLower);
         });
 
         switch (activeTab) {
@@ -360,7 +364,7 @@ const CommunityPage: React.FC<CommunityPageProps> = ({ onStartChat }) => {
                                 <p>{translate('community.find.emptyPrompt')}</p>
                             </div>
                         ) : filteredFarmers.length === 0 ? (
-                            <p className="text-center text-gray-500 py-8">No farmers found with username matching "{searchTerm}"</p>
+                            <p className="text-center text-gray-500 py-8">No farmers found matching "{searchTerm}"</p>
                         ) : (
                             filteredFarmers.map(farmer => {
                                 const { status } = farmerStatusMap.get(farmer.uid) || {};

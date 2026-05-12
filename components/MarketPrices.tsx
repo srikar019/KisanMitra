@@ -11,6 +11,7 @@ import Icon from './common/Icon';
 import SetMarketAlertDialog from './modals/SetMarketAlertDialog';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSharedState } from '../contexts/SharedStateContext';
+import LiveCommoditiesMarket from './LiveCommoditiesMarket';
 
 interface MarketPricesProps {
 }
@@ -114,6 +115,7 @@ const PriceChart: React.FC<{ historicalData: PriceDataPoint[], predictedData: Pr
 const MarketPrices: React.FC<MarketPricesProps> = () => {
   const { currentUser } = useAuth();
   const { translate, language } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'prediction' | 'live'>('live');
   const [crop, setCrop] = useSharedState<string>('market_crop', '');
   const [location, setLocation] = useSharedState<string>('market_location', '');
   
@@ -270,11 +272,37 @@ const MarketPrices: React.FC<MarketPricesProps> = () => {
   return (
     <Card>
       {prediction && <SetMarketAlertDialog isOpen={isCustomAlertModalOpen} onClose={handleCustomAlertModalClose} crop={prediction.cropName} location={prediction.location} priceUnit={prediction.priceUnit} />}
-      <div className="flex items-center mb-6">
-          <Icon name="chart-bar" className="h-8 w-8 text-indigo-500 mr-3"/>
-          <h2 className="text-2xl font-bold text-gray-700">{translate('marketPrices.title')}</h2>
+      
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <div className="flex items-center">
+              <Icon name="chart-bar" className="h-8 w-8 text-indigo-500 mr-3"/>
+              <h2 className="text-2xl font-bold text-gray-700">{translate('marketPrices.title')}</h2>
+          </div>
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+              <button 
+                  onClick={() => setActiveTab('prediction')} 
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'prediction' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                  AI Predictions
+              </button>
+              <button 
+                  onClick={() => setActiveTab('live')} 
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center ${activeTab === 'live' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                  <span className="relative flex h-2 w-2 mr-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  </span>
+                  Live Exchange
+              </button>
+          </div>
       </div>
-      <p className="text-gray-600 mb-6">{translate('marketPrices.description')}</p>
+      
+      {activeTab === 'live' ? (
+          <LiveCommoditiesMarket />
+      ) : (
+          <div className="animate-fade-in">
+              <p className="text-gray-600 mb-6">{translate('marketPrices.description')}</p>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div>
@@ -417,6 +445,8 @@ const MarketPrices: React.FC<MarketPricesProps> = () => {
             </div>
           )}
         </div>
+      )}
+          </div>
       )}
     </Card>
   );

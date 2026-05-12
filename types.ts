@@ -16,7 +16,7 @@ export enum ActiveView {
   CSAManagement = 'CSA Management',
   MyDeals = 'My Deals',
   MyFarm = 'My Farm',
-
+  Dashboard = 'Dashboard',
 }
 
 export interface ParsedListItem {
@@ -212,6 +212,7 @@ export interface ProductListing {
     createdAt?: Date;
     targetPrice?: number;
     lowestPrices?: number[];
+    description?: string;
 }
 
 export interface RetailOrder {
@@ -762,4 +763,77 @@ export interface IrrigationAlert {
   message: string;
 }
 
+// ── Trust & Transparency System ───────────────────────────────────────
+
+export type VerificationLevel = 'basic' | 'verified' | 'certified' | 'premium';
+export type FarmingMethod = 'organic' | 'natural' | 'integrated' | 'conventional';
+export type PesticideRiskLevel = 'minimal' | 'low' | 'moderate' | 'high';
+
+export interface FarmerCertification {
+  type: 'FSSAI' | 'OrganicIndia' | 'PGS' | 'other';
+  certificateUrl: string;
+  aiVerified: boolean;
+  verifiedAt?: Date;
+  label?: string;
+}
+
+export interface FarmerVerification {
+  farmerUid: string;
+  phoneVerified: boolean;
+  locationVerified: boolean;
+  farmCoordinates?: { lat: number; lng: number };
+  farmSizeAcres?: number;
+  farmingMethod?: FarmingMethod;
+  yearsExperience?: number;
+  certifications: FarmerCertification[];
+  verificationLevel: VerificationLevel;
+  updatedAt?: Date;
+}
+
+export interface ProductPassport {
+  id: string;
+  listingId: string;
+  farmerUid: string;
+  cropName: string;
+  generatedAt: Date;
+  soilHealthScore: number;
+  ndviScore: number;
+  pesticideRiskLevel: PesticideRiskLevel;
+  diseaseHistory: {
+    hasRecentDisease: boolean;
+    lastScanDate?: Date;
+    scanResult: string;
+  };
+  weatherSummary: string;
+  aiConfidence: number;
+  aiSummary: string;
+  harvestDate: Date;
+}
+
+export interface FarmerReview {
+  id: string;
+  farmerUid: string;
+  customerUid: string;
+  customerName: string;
+  orderId: string;
+  ratings: {
+    freshness: number;
+    quality: number;
+    honesty: number;
+    communication: number;
+  };
+  overallScore: number;
+  comment: string;
+  unboxingPhotoUrl?: string;
+  createdAt: Date;
+}
+
+export interface FarmerTrustStats {
+  totalOrders: number;
+  repeatRate: number;
+  avgDeliveryDays: number;
+  complaintsCount: number;
+  avgRating: number;
+  totalReviews: number;
+}
 

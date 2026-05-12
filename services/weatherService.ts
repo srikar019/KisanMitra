@@ -2,15 +2,31 @@
  * Gemini AI Service — Weather & Location Module
  * Handles weather forecasts, coordinates, microclimate analysis, and weather alerts.
  */
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import type { WeatherData, MicroclimateAnalysis, Alert, Zone } from '../types';
 import { TTLCache } from './retryUtils';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
-}
+// ── Server-side Gemini proxy (API key stays on server) ──
+const geminiProxy = async (params: { model: string; contents: any; config?: any }): Promise<{ text: string }> => {
+    const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Gemini request failed' }));
+        throw new Error(err.error || `Gemini proxy error: ${res.status}`);
+    }
+    return res.json();
+};
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = {
+    models: {
+        generateContent: async (params: { model: string; contents: any; config?: any }) => {
+            return geminiProxy(params);
+        },
+    },
+};
 
 // ─── TTL Caches (5-minute TTL, max 50 entries) ──────────────────────────
 const weatherCache = new TTLCache<string, WeatherData>(5 * 60 * 1000, 50);

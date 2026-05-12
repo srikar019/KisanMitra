@@ -21,6 +21,7 @@ export const viewToPath: Record<ActiveView, string> = {
   [ActiveView.CSAManagement]: 'csa',
   [ActiveView.MyDeals]: 'deals',
   [ActiveView.MyFarm]: 'my-farm',
+  [ActiveView.Dashboard]: 'dashboard',
 };
 
 /** Reverse lookup — URL path segment to ActiveView */

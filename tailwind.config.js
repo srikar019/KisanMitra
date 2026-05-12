@@ -73,7 +73,7 @@ export default {
         "sans": ["Inter", "sans-serif"],
         "serif": ["Playfair Display", "serif"],
         "script": ["Caveat", "cursive"],
-        "headline": ["Lexend", "sans-serif"],
+        "headline": ["Instrument Serif", "serif"],
         "body": ["Inter", "sans-serif"],
         "label": ["Inter", "sans-serif"]
       },

@@ -13,7 +13,7 @@ import { updateFarmerInfoOnListings } from './marketplaceService';
  * @param user The user object from Firebase Auth.
  * @param role The role to assign if missing.
  */
-export const ensureUserProfile = async (user: firebase.User, role: 'farmer' | 'customer' | 'admin'): Promise<void> => {
+export const ensureUserProfile = async (user: firebase.User, role: 'farmer' | 'customer' | 'admin', username?: string): Promise<void> => {
     if (!user) return;
     const userRef = firestore.collection('users').doc(user.uid);
     
@@ -25,6 +25,7 @@ export const ensureUserProfile = async (user: firebase.User, role: 'farmer' | 'c
             await userRef.set({
                 email: user.email,
                 role,
+                username: username || '',
                 name: '',
                 location: '',
                 phoneNumber: '',

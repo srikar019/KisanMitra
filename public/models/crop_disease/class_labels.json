@@ -1,0 +1,160 @@
+{
+  "labels": [
+    "Pepper__bell___Bacterial_spot",
+    "Pepper__bell___healthy",
+    "Potato___Early_blight",
+    "Potato___Late_blight",
+    "Potato___healthy",
+    "Tomato_Bacterial_spot",
+    "Tomato_Early_blight",
+    "Tomato_Late_blight",
+    "Tomato_Leaf_Mold",
+    "Tomato_Septoria_leaf_spot",
+    "Tomato_Spider_mites_Two_spotted_spider_mite",
+    "Tomato__Target_Spot",
+    "Tomato__Tomato_YellowLeaf__Curl_Virus",
+    "Tomato__Tomato_mosaic_virus",
+    "Tomato_healthy"
+  ],
+  "num_classes": 15,
+  "display_names": {
+    "Pepper__bell___Bacterial_spot": { "crop": "Bell Pepper", "disease": "Bacterial Spot", "healthy": false },
+    "Pepper__bell___healthy": { "crop": "Bell Pepper", "disease": "Healthy", "healthy": true },
+    "Potato___Early_blight": { "crop": "Potato", "disease": "Early Blight", "healthy": false },
+    "Potato___Late_blight": { "crop": "Potato", "disease": "Late Blight", "healthy": false },
+    "Potato___healthy": { "crop": "Potato", "disease": "Healthy", "healthy": true },
+    "Tomato_Bacterial_spot": { "crop": "Tomato", "disease": "Bacterial Spot", "healthy": false },
+    "Tomato_Early_blight": { "crop": "Tomato", "disease": "Early Blight", "healthy": false },
+    "Tomato_Late_blight": { "crop": "Tomato", "disease": "Late Blight", "healthy": false },
+    "Tomato_Leaf_Mold": { "crop": "Tomato", "disease": "Leaf Mold", "healthy": false },
+    "Tomato_Septoria_leaf_spot": { "crop": "Tomato", "disease": "Septoria Leaf Spot", "healthy": false },
+    "Tomato_Spider_mites_Two_spotted_spider_mite": { "crop": "Tomato", "disease": "Spider Mites (Two-spotted)", "healthy": false },
+    "Tomato__Target_Spot": { "crop": "Tomato", "disease": "Target Spot", "healthy": false },
+    "Tomato__Tomato_YellowLeaf__Curl_Virus": { "crop": "Tomato", "disease": "Yellow Leaf Curl Virus", "healthy": false },
+    "Tomato__Tomato_mosaic_virus": { "crop": "Tomato", "disease": "Mosaic Virus", "healthy": false },
+    "Tomato_healthy": { "crop": "Tomato", "disease": "Healthy", "healthy": true }
+  },
+  "treatment_info": {
+    "Pepper__bell___Bacterial_spot": {
+      "description": "Caused by Xanthomonas species. Small, dark, water-soaked spots on leaves and raised scab-like spots on fruit.",
+      "treatment": [
+        "Apply copper-based bactericides (Copper hydroxide)",
+        "Use disease-free seeds and transplants",
+        "Avoid overhead irrigation and working in wet fields",
+        "Rotate with non-solanaceous crops for 2-3 years"
+      ],
+      "severity": "moderate"
+    },
+    "Potato___Early_blight": {
+      "description": "Caused by Alternaria solani. Dark brown spots with concentric rings (target spots) on lower leaves first.",
+      "treatment": [
+        "Apply Chlorothalonil or Mancozeb fungicides preventatively",
+        "Rotate crops (3-year rotation)",
+        "Remove volunteer potato plants",
+        "Ensure adequate nutrition (especially nitrogen)"
+      ],
+      "severity": "moderate"
+    },
+    "Potato___Late_blight": {
+      "description": "Caused by Phytophthora infestans. Water-soaked lesions that rapidly enlarge. The disease that caused the Irish Potato Famine.",
+      "treatment": [
+        "Apply Metalaxyl or Dimethomorph fungicides immediately",
+        "Destroy all infected plant material",
+        "Use certified disease-free seed potatoes",
+        "Avoid overhead irrigation",
+        "This is an emergency - act fast to prevent spread"
+      ],
+      "severity": "severe"
+    },
+    "Tomato_Bacterial_spot": {
+      "description": "Caused by Xanthomonas species. Small, dark, water-soaked spots on leaves and raised spots on fruit.",
+      "treatment": [
+        "Apply copper-based bactericides (Copper hydroxide)",
+        "Use disease-free seeds and transplants",
+        "Avoid working in wet fields",
+        "Rotate with non-solanaceous crops for 2-3 years"
+      ],
+      "severity": "moderate"
+    },
+    "Tomato_Early_blight": {
+      "description": "Caused by Alternaria solani. Dark concentric-ringed spots starting on older leaves, working upward.",
+      "treatment": [
+        "Apply Chlorothalonil or Mancozeb fungicides",
+        "Mulch to prevent soil splash",
+        "Stake plants for better air circulation",
+        "Remove infected lower leaves"
+      ],
+      "severity": "moderate"
+    },
+    "Tomato_Late_blight": {
+      "description": "Caused by Phytophthora infestans. Large, irregularly shaped, water-soaked lesions. Can destroy entire crops rapidly.",
+      "treatment": [
+        "Apply Metalaxyl or Chlorothalonil immediately",
+        "Remove and destroy all infected plants",
+        "Avoid overhead watering",
+        "Use resistant varieties (e.g., Mountain Merit)"
+      ],
+      "severity": "severe"
+    },
+    "Tomato_Leaf_Mold": {
+      "description": "Caused by Passalora fulva. Pale yellow spots on upper leaf surface, olive-green mold on lower surface.",
+      "treatment": [
+        "Improve greenhouse ventilation",
+        "Reduce humidity below 85%",
+        "Apply fungicides like Chlorothalonil",
+        "Use resistant varieties"
+      ],
+      "severity": "moderate"
+    },
+    "Tomato_Septoria_leaf_spot": {
+      "description": "Caused by Septoria lycopersici. Numerous small, circular spots with dark borders and gray centers.",
+      "treatment": [
+        "Remove and destroy infected lower leaves",
+        "Apply Mancozeb or Chlorothalonil fungicides",
+        "Mulch around plants",
+        "Avoid overhead irrigation"
+      ],
+      "severity": "moderate"
+    },
+    "Tomato_Spider_mites_Two_spotted_spider_mite": {
+      "description": "Tiny arachnids that feed on leaf undersides causing stippling, yellowing, and webbing.",
+      "treatment": [
+        "Spray plants with strong water jets to dislodge mites",
+        "Use miticides like Abamectin or Spiromesifen",
+        "Introduce predatory mites (Phytoseiulus persimilis)",
+        "Avoid broad-spectrum insecticides that kill natural predators"
+      ],
+      "severity": "moderate"
+    },
+    "Tomato__Target_Spot": {
+      "description": "Caused by Corynespora cassiicola. Concentric-ringed brown spots on leaves, stems, and fruit.",
+      "treatment": [
+        "Apply Azoxystrobin or Chlorothalonil fungicides",
+        "Improve plant spacing for air circulation",
+        "Remove and destroy affected plant parts",
+        "Rotate crops annually"
+      ],
+      "severity": "moderate"
+    },
+    "Tomato__Tomato_YellowLeaf__Curl_Virus": {
+      "description": "A viral disease transmitted by whiteflies. Causes severe leaf curling, yellowing, and stunted growth.",
+      "treatment": [
+        "Control whiteflies with Imidacloprid or yellow sticky traps",
+        "Remove and destroy infected plants immediately",
+        "Use reflective mulch to repel whiteflies",
+        "Plant TYLCV-resistant varieties"
+      ],
+      "severity": "severe"
+    },
+    "Tomato__Tomato_mosaic_virus": {
+      "description": "A viral disease causing mosaic patterns (mottled light/dark green) on leaves and reduced fruit quality.",
+      "treatment": [
+        "No cure exists - remove and destroy infected plants",
+        "Disinfect tools with 10% bleach solution",
+        "Wash hands before handling plants",
+        "Use virus-free certified seed"
+      ],
+      "severity": "severe"
+    }
+  }
+}

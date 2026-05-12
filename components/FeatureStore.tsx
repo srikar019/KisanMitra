@@ -13,7 +13,6 @@ const ALL_FEATURES: { view: ActiveView; title: string; description: string; }[] 
     { view: ActiveView.FarmAssetsExchange, title: 'Farm Assets & Exchange', description: 'Manage your livestock records and trade animals or produce directly with other farmers.' },
     { view: ActiveView.Community, title: 'Community Hub', description: 'Build your private network by connecting and chatting with other trusted farmers.' },
     { view: ActiveView.CSAManagement, title: 'CSA Management', description: 'Manage your Community Supported Agriculture program, from member subscriptions to delivery schedules.' },
-
 ];
 
 const SeedSwitch: React.FC<{ checked: boolean; disabled?: boolean; }> = ({ checked, disabled }) => {

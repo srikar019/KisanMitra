@@ -20,10 +20,10 @@ const NegotiationList: React.FC<NegotiationListProps> = ({ onStartNegotiation, a
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (currentUser?.email) {
+        if (currentUser?.uid) {
             setLoading(true);
             const unsubscribe = onActiveNegotiationsForCustomerSnapshot(
-                currentUser.email,
+                currentUser.uid,
                 (fetchedDeals) => {
                     setNegotiations(fetchedDeals);
                     setLoading(false);

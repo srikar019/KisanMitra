@@ -19,7 +19,7 @@ const OrderHistory: React.FC<OrderHistoryProps> = ({ onCancelOrder }) => {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (currentUser?.email) {
+        if (currentUser?.uid) {
             setLoading(true);
             let negoLoaded = false;
             let retailLoaded = false;
@@ -31,7 +31,7 @@ const OrderHistory: React.FC<OrderHistoryProps> = ({ onCancelOrder }) => {
             };
 
             const unsubscribeNegotiations = onDealsForCustomerSnapshot(
-                currentUser.email,
+                currentUser.uid,
                 (fetchedDeals) => {
                     setNegotiationDeals(fetchedDeals);
                     negoLoaded = true;
@@ -45,7 +45,7 @@ const OrderHistory: React.FC<OrderHistoryProps> = ({ onCancelOrder }) => {
             );
 
              const unsubscribeRetail = onRetailOrdersForCustomerSnapshot(
-                currentUser.email,
+                currentUser.uid,
                 (fetchedOrders) => {
                     setRetailOrders(fetchedOrders);
                     retailLoaded = true;

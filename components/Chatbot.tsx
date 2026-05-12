@@ -6,44 +6,26 @@ import type { ChatMessage } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import Icon from './common/Icon';
 
+// NOTE: Voice sessions require the GoogleGenAI SDK client-side for WebSocket streaming.
+// The API key for voice is fetched from the server at session start time.
+// Text chat goes through the server-side /api/gemini proxy (no key exposure).
+
 /**
  * Formats the raw text response from the AI into a clean, bulleted list.
- * @param responseText The raw string from the AI.
- * @returns A formatted string with 4-5 bullet points.
  */
 const formatAIResponse = (responseText: string): string => {
   const trimmedResponse = responseText.trim();
-
-  // 1. If the response is already a list, return it as is to preserve formatting.
   const isAlreadyList = /^\s*([*-]|\d+\.)/m.test(trimmedResponse);
-  if (isAlreadyList) {
-    return trimmedResponse;
-  }
+  if (isAlreadyList) return trimmedResponse;
 
-  // 2. Split the response into sentences. This regex is more robust than a simple split.
   let sentences: string[] = trimmedResponse.match(/[^.!?]+[.!?](\s|$)/g) || [];
-
-  // 3. As a fallback for long sentences, try splitting by clauses if it makes sense.
   if (sentences.length <= 1 && trimmedResponse.includes(',')) {
       const clauses = trimmedResponse.split(',').map(s => s.trim()).filter(s => s.length > 15);
-      if (clauses.length > 2) {
-        sentences = clauses;
-      }
+      if (clauses.length > 2) sentences = clauses;
   }
-  
-  // 4. If we still only have one item, just bullet that.
-  if (sentences.length <= 1) {
-    return `• ${trimmedResponse}`;
-  }
-
-  // 5. Limit to 4-5 key points for clarity.
-  const keyPoints = sentences.slice(0, 5);
-
-  // 6. Join the points into a single string with bullet points and newlines.
-  return keyPoints.map(s => `• ${s.trim()}`).join('\n');
+  if (sentences.length <= 1) return `• ${trimmedResponse}`;
+  return sentences.slice(0, 5).map(s => `• ${s.trim()}`).join('\n');
 };
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Audio Helper Functions ---
 function decode(base64: string) {
@@ -117,8 +99,9 @@ const Chatbot: React.FC = () => {
   const [currentTranscription, setCurrentTranscription] = useState({ user: '', model: '' });
   const [voiceError, setVoiceError] = useState<string | null>(null);
   
-  // FIX: Infer the session promise type from the SDK's connect method to avoid using the unexported 'LiveSession' type.
-  const sessionPromiseRef = useRef<ReturnType<typeof ai.live.connect> | null>(null);
+  // FIX: Infer the session promise type dynamically. The `ai` instance is created lazily for voice only.
+  const sessionPromiseRef = useRef<any>(null);
+  const aiInstanceRef = useRef<GoogleGenAI | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -183,7 +166,25 @@ const Chatbot: React.FC = () => {
       // FIX: Cast window to `any` to allow for `webkitAudioContext` fallback for older browsers without causing a TypeScript error.
       outputAudioContextRef.current = new ((window as any).AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
-      sessionPromiseRef.current = ai.live.connect({
+      // For voice, we need to create a client-side instance.
+      // This is a known limitation — voice WebSockets can't be proxied.
+      // Key is fetched at runtime with auth, NOT baked into the bundle.
+      if (!aiInstanceRef.current) {
+        // Get the current user's Firebase ID token for authentication
+        const { auth } = await import('../services/firebase');
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) throw new Error('Please sign in to use voice chat');
+
+        const keyRes = await fetch('/api/voice-key', {
+          headers: { 'Authorization': `Bearer ${idToken}` },
+        });
+        if (!keyRes.ok) throw new Error('Voice authentication failed');
+        const { key } = await keyRes.json();
+        if (!key) throw new Error('Voice key unavailable');
+        aiInstanceRef.current = new GoogleGenAI({ apiKey: key });
+      }
+
+      sessionPromiseRef.current = aiInstanceRef.current.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: {
           onopen: () => {
@@ -195,7 +196,7 @@ const Chatbot: React.FC = () => {
               const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
               const pcmBlob = createBlob(inputData);
               if (sessionPromiseRef.current) {
-                sessionPromiseRef.current.then((session) => {
+                sessionPromiseRef.current.then((session: any) => {
                   session.sendRealtimeInput({ media: pcmBlob });
                 });
               }

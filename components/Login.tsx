@@ -17,6 +17,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
   const { translate } = useLanguage();
   const [view, setView] = useState<'signIn' | 'signUp' | 'resetPassword'>('signIn');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -31,7 +32,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
     setIsAuthenticating(view !== 'resetPassword');
     try {
       if (view === 'signUp') {
-        await signUp(email, password, 'farmer');
+        await signUp(email, password, 'farmer', username);
       } else if (view === 'signIn') {
         await signIn(email, password, 'farmer');
       } else { // resetPassword
@@ -62,6 +63,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
     setError(null);
     setSuccess(null);
     setPassword('');
+    setUsername('');
     setView(newView);
   };
 
@@ -82,7 +84,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
           <span className="text-xl font-bold text-[#1B4332] tracking-tight">KisanMitra</span>
         </button>
         <div className="flex items-center space-x-4">
-            <LanguageSwitcher variant="dark" />
+          <LanguageSwitcher variant="dark" />
         </div>
       </header>
 
@@ -145,25 +147,47 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                 )}
 
                 <form className="space-y-8" onSubmit={handleSubmit}>
-                  {/* Email/Phone Field */}
+                  {/* Dynamic Email/Username Field */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-bold tracking-[0.2em] text-[#1B4332] uppercase flex justify-between">
-                      {view === 'signIn' ? translate('login.email.label') : translate('login.email.label')}
+                      {view === 'signIn' ? "Username or Email" : translate('login.email.label')}
                     </label>
                     <div className="relative group">
                       <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[#1B4332]/30 group-focus-within:text-[#1B4332] transition-colors">
-                        <Icon name="mail" className="h-5 w-5" />
+                        <Icon name={view === 'signIn' ? "user-circle" : "mail"} className="h-5 w-5" />
                       </div>
                       <input
-                        type="email"
+                        type={view === 'signIn' ? "text" : "email"}
                         required
-                        placeholder={view === 'signIn' ? translate('login.email.placeholder') : "you@farm.com"}
-                        className="w-full bg-[#E8F1E9]/40 border-none rounded-2xl py-4 pl-14 pr-6 text-[15px] focus:ring-2 focus:ring-[#1B4332]/20 placeholder-[#1B4332]/20 text-[#1B4332] transition-all"
+                        placeholder={view === 'signIn' ? "Enter your username or email" : "you@farm.com"}
+                        className="w-full bg-[#E8F1E9]/40 border-none rounded-2xl py-4 pl-14 pr-6 text-[15px] focus:ring-2 focus:ring-[#1B4332]/20 placeholder-[#1B4332]/40 text-[#1B4332] transition-all"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                       />
                     </div>
                   </div>
+
+                  {/* Username Field (Only for Sign Up) */}
+                  {view === 'signUp' && (
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold tracking-[0.2em] text-[#1B4332] uppercase flex justify-between">
+                        Username
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[#1B4332]/30 group-focus-within:text-[#1B4332] transition-colors">
+                          <Icon name="user-circle" className="h-5 w-5" />
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          placeholder="johndoe123"
+                          className="w-full bg-[#E8F1E9]/40 border-none rounded-2xl py-4 pl-14 pr-6 text-[15px] focus:ring-2 focus:ring-[#1B4332]/20 placeholder-[#1B4332]/40 text-[#1B4332] transition-all"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Password Field */}
                   {view !== 'resetPassword' && (
@@ -228,7 +252,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                 <div className="mt-12 text-center">
                   <p className="text-[13px] font-medium text-[#2D3E33]/60">
                     {view === 'signIn' ? translate('login.newToApp') : translate('login.alreadyMember')} {' '}
-                    <button 
+                    <button
                       onClick={() => switchView(view === 'signIn' ? 'signUp' : 'signIn')}
                       className="font-bold text-[#1B4332] hover:underline"
                     >

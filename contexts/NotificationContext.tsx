@@ -63,7 +63,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const chatsQuery = firestore.collection('chats')
           .where('participants', 'array-contains', currentUser.uid);
       
-      unsubChats = chatsQuery.onSnapshot(snapshot => {
+      unsubChats = chatsQuery.onSnapshot(
+        snapshot => {
           const newNotifications: ChatNotification[] = [];
           snapshot.docs.forEach(doc => {
               const data = doc.data();
@@ -86,7 +87,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
               }
           });
           setChatNotifications(newNotifications);
-      });
+        },
+        error => {
+          console.error("Error in chatsQuery snapshot:", error);
+        }
+      );
 
 
     } else {

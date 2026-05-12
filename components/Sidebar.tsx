@@ -12,6 +12,7 @@ interface SidebarProps {
 }
 
 const navIcons: { [key in ActiveView]?: string } = {
+  [ActiveView.Dashboard]: 'home',
   [ActiveView.Weather]: 'sun',
   [ActiveView.HealthAnalysis]: 'shield-check',
   [ActiveView.PlantingRecommendations]: 'light-bulb',
@@ -35,6 +36,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, activeView, setAct
    const navItems = (enabledFeatures || [])
     .filter(view => view !== ActiveView.Profile && view !== ActiveView.AddFeatures && view !== ActiveView.IndianAgriNews && view !== ActiveView.MyDeals && view !== ActiveView.MyFarm)
     .sort((a, b) => {
+        if (a === ActiveView.Dashboard) return -1;
+        if (b === ActiveView.Dashboard) return 1;
         if (a === ActiveView.Weather) return -1;
         if (b === ActiveView.Weather) return 1;
         return a.localeCompare(b);

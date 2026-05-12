@@ -11,6 +11,7 @@ import Icon from './common/Icon';
 import Button from './common/Button';
 import Spinner from './common/Spinner';
 import SetWeatherAlertDialog from './modals/SetWeatherAlertDialog';
+import SatelliteFarmTwin from './SatelliteFarmTwin';
 
 declare const L: any;
 
@@ -18,73 +19,74 @@ interface WeatherProps {
 }
 
 const AlertDisplay: React.FC<{ alert: Omit<Alert, 'id' | 'uid' | 'status' | 'createdAt' | 'relatedView' | 'relatedEntityId'> }> = ({ alert }) => {
-    const severityClasses = {
-        info: {
-            bg: 'bg-blue-50',
-            border: 'border-blue-200',
-            icon: 'info',
-            iconColor: 'text-blue-500'
-        },
-        warning: {
-            bg: 'bg-yellow-50',
-            border: 'border-yellow-200',
-            icon: 'alert-triangle',
-            iconColor: 'text-yellow-500'
-        },
-        danger: {
-            bg: 'bg-red-50',
-            border: 'border-red-200',
-            icon: 'alert-octagon',
-            iconColor: 'text-red-500'
-        }
-    };
-    const classes = severityClasses[alert.severity] || severityClasses.info;
+  const severityClasses = {
+    info: {
+      bg: 'bg-blue-50',
+      border: 'border-blue-200',
+      icon: 'info',
+      iconColor: 'text-blue-500'
+    },
+    warning: {
+      bg: 'bg-yellow-50',
+      border: 'border-yellow-200',
+      icon: 'alert-triangle',
+      iconColor: 'text-yellow-500'
+    },
+    danger: {
+      bg: 'bg-red-50',
+      border: 'border-red-200',
+      icon: 'alert-octagon',
+      iconColor: 'text-red-500'
+    }
+  };
+  const classes = severityClasses[alert.severity] || severityClasses.info;
 
-    return (
-        <div className={`p-4 rounded-lg border ${classes.bg} ${classes.border} flex items-start gap-3`}>
-            <Icon name={classes.icon} className={`h-6 w-6 ${classes.iconColor} flex-shrink-0 mt-0.5`} />
-            <div>
-                <h4 className="font-semibold text-gray-800 capitalize">{alert.severity}</h4>
-                <p className="text-sm text-gray-600">{alert.message}</p>
-            </div>
-        </div>
-    );
+  return (
+    <div className={`p-4 rounded-lg border ${classes.bg} ${classes.border} flex items-start gap-3`}>
+      <Icon name={classes.icon} className={`h-6 w-6 ${classes.iconColor} flex-shrink-0 mt-0.5`} />
+      <div>
+        <h4 className="font-semibold text-gray-800 capitalize">{alert.severity}</h4>
+        <p className="text-sm text-gray-600">{alert.message}</p>
+      </div>
+    </div>
+  );
 };
 
 
 const Weather: React.FC<WeatherProps> = () => {
   const { currentUser } = useAuth();
   const { translate } = useLanguage();
-  
+
   const {
-      location, setLocation,
-      displayLocation, setDisplayLocation,
-      coordinates, setCoordinates,
-      weatherData, setWeatherData,
-      loading, setLoading,
-      error, setError,
-      weatherClass, setWeatherClass,
-      activeAlert, setActiveAlert,
-      microclimateData, setMicroclimateData,
-      microclimateLoading, setMicroclimateLoading,
-      microclimateError, setMicroclimateError
+    location, setLocation,
+    displayLocation, setDisplayLocation,
+    coordinates, setCoordinates,
+    weatherData, setWeatherData,
+    loading, setLoading,
+    error, setError,
+    weatherClass, setWeatherClass,
+    activeAlert, setActiveAlert,
+    microclimateData, setMicroclimateData,
+    microclimateLoading, setMicroclimateLoading,
+    microclimateError, setMicroclimateError
   } = useWeather();
   const [isCustomAlertModalOpen, setIsCustomAlertModalOpen] = useState(false);
   const [customAlerts, setCustomAlerts] = useState<CustomAlert[]>([]);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
-  
+  const [showSatellite, setShowSatellite] = useState(false);
+
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  
+
   const [animatedIconIndex, setAnimatedIconIndex] = useState(0);
   const animatedIcons = ['sun', 'cloud', 'cloud-rain'];
 
   const leafletMapRef = useRef<any | null>(null);
   const leafletMarkersRef = useRef<any[]>([]);
-  
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchWeather = useCallback(async (loc: string) => {
@@ -103,26 +105,26 @@ const Weather: React.FC<WeatherProps> = () => {
       const data = await getWeatherForecast(loc);
       setWeatherData(data);
       setDisplayLocation(loc);
-      
+
       const latLngRegex = /^-?([1-8]?[1-9]|[1-9]0)\.{1}\d{1,6},\s*-?([1-8]?[1-9]|[1-9]0|[1]?[0-7]?[0-9])\.{1}\d{1,6}$/;
       if (latLngRegex.test(loc.replace(/\s/g, ''))) {
-          const [lat, lng] = loc.split(',').map(Number);
-          setCoordinates({ lat, lng });
+        const [lat, lng] = loc.split(',').map(Number);
+        setCoordinates({ lat, lng });
       } else {
-          const { lat, lng } = await getCoordinatesForLocation(loc);
-          setCoordinates({ lat, lng });
+        const { lat, lng } = await getCoordinatesForLocation(loc);
+        setCoordinates({ lat, lng });
       }
-      
+
       if (currentUser) {
-          try {
-              const alertData = await analyzeWeatherForAlerts(data);
-              if (alertData) {
-                  setActiveAlert(alertData);
-                  await createAlert(currentUser.uid, alertData, 'Weather' as ActiveView, loc.trim().toLowerCase());
-              }
-          } catch (aiAlertError) {
-              console.error("Failed to run automatic AI alert analysis:", aiAlertError);
+        try {
+          const alertData = await analyzeWeatherForAlerts(data);
+          if (alertData) {
+            setActiveAlert(alertData);
+            await createAlert(currentUser.uid, alertData, 'Weather' as ActiveView, loc.trim().toLowerCase());
           }
+        } catch (aiAlertError) {
+          console.error("Failed to run automatic AI alert analysis:", aiAlertError);
+        }
       }
 
 
@@ -142,23 +144,23 @@ const Weather: React.FC<WeatherProps> = () => {
       }
     };
   }, []);
-  
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
-                setIsSuggestionsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+        setIsSuggestionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentUser) return;
     const unsubscribe = onCustomAlertsSnapshot(currentUser.uid, (alerts) => {
-        setCustomAlerts(alerts.filter(a => a.type === 'weather'));
+      setCustomAlerts(alerts.filter(a => a.type === 'weather'));
     });
     return () => unsubscribe();
   }, [currentUser]);
@@ -199,67 +201,67 @@ const Weather: React.FC<WeatherProps> = () => {
     newLeafletMarkers.push(mainMarker);
 
     microclimateData?.zones.forEach(zone => {
-        const zoneIcon = L.divIcon({ html: `<div class="p-1 bg-white/80 rounded-full shadow-lg text-center"><b class="text-blue-700">${zone.temperatureDelta}</b></div>`, className: 'map-zone-icon', iconSize: [40, 40], iconAnchor: [20, 20] });
-        const zoneMarker = L.marker([zone.coordinates.lat, zone.coordinates.lng], { icon: zoneIcon }).bindPopup(`<b>${zone.zoneName}</b><br>Risk: ${zone.risk}`);
-        newLeafletMarkers.push(zoneMarker);
+      const zoneIcon = L.divIcon({ html: `<div class="p-1 bg-white/80 rounded-full shadow-lg text-center"><b class="text-blue-700">${zone.temperatureDelta}</b></div>`, className: 'map-zone-icon', iconSize: [40, 40], iconAnchor: [20, 20] });
+      const zoneMarker = L.marker([zone.coordinates.lat, zone.coordinates.lng], { icon: zoneIcon }).bindPopup(`<b>${zone.zoneName}</b><br>Risk: ${zone.risk}`);
+      newLeafletMarkers.push(zoneMarker);
     });
 
     newLeafletMarkers.forEach(m => m.addTo(leafletMapRef.current));
     leafletMarkersRef.current = newLeafletMarkers;
     if (newLeafletMarkers.length > 1) {
-        leafletMapRef.current.fitBounds(L.featureGroup(newLeafletMarkers).getBounds().pad(0.2));
+      leafletMapRef.current.fitBounds(L.featureGroup(newLeafletMarkers).getBounds().pad(0.2));
     } else {
-        leafletMapRef.current.setView([coordinates.lat, coordinates.lng], 10);
+      leafletMapRef.current.setView([coordinates.lat, coordinates.lng], 10);
     }
-}, [coordinates, weatherData, displayLocation, microclimateData]);
+  }, [coordinates, weatherData, displayLocation, microclimateData]);
 
-useEffect(() => {
+  useEffect(() => {
     // Map requires coordinates and container
     if (!coordinates || !mapContainerRef.current) return;
 
     const initMap = () => {
-        if (!mapContainerRef.current || typeof L === 'undefined') return;
-        
-        if (!leafletMapRef.current) {
-            const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri' });
-            
-            leafletMapRef.current = L.map(mapContainerRef.current, { 
-                center: [coordinates.lat, coordinates.lng], 
-                zoom: 10, 
-                layers: [streetLayer] 
-            });
-            L.control.layers({ "Street": streetLayer, "Satellite": satelliteLayer }).addTo(leafletMapRef.current);
-        }
-        
-        // Update markers whenever dependencies change
-        leafletMapRef.current.invalidateSize();
-        updateMarkers();
+      if (!mapContainerRef.current || typeof L === 'undefined') return;
+
+      if (!leafletMapRef.current) {
+        const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri' });
+
+        leafletMapRef.current = L.map(mapContainerRef.current, {
+          center: [coordinates.lat, coordinates.lng],
+          zoom: 10,
+          layers: [streetLayer]
+        });
+        L.control.layers({ "Street": streetLayer, "Satellite": satelliteLayer }).addTo(leafletMapRef.current);
+      }
+
+      // Update markers whenever dependencies change
+      leafletMapRef.current.invalidateSize();
+      updateMarkers();
     };
 
     if (typeof L !== 'undefined') {
-        initMap();
+      initMap();
     } else {
-        const pollLeaflet = setInterval(() => {
-            if (typeof L !== 'undefined') {
-                clearInterval(pollLeaflet);
-                initMap();
-            }
-        }, 100);
-        return () => clearInterval(pollLeaflet);
+      const pollLeaflet = setInterval(() => {
+        if (typeof L !== 'undefined') {
+          clearInterval(pollLeaflet);
+          initMap();
+        }
+      }, 100);
+      return () => clearInterval(pollLeaflet);
     }
-}, [coordinates, updateMarkers]);
+  }, [coordinates, updateMarkers]);
 
-  
+
   useEffect(() => {
     if (weatherData) {
-        const newClass = getWeatherClassForData(weatherData);
-        setWeatherClass(newClass);
+      const newClass = getWeatherClassForData(weatherData);
+      setWeatherClass(newClass);
     } else {
-        setWeatherClass('sunny');
+      setWeatherClass('sunny');
     }
   }, [weatherData, getWeatherClassForData]);
-  
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     if (loading) {
@@ -345,7 +347,7 @@ useEffect(() => {
       setError(translate('weather.error.geo'));
     }
   };
-  
+
   const handleAnalyzeMicroclimate = async () => {
     if (!weatherData || !coordinates) {
       setMicroclimateError("Please get a general weather forecast first.");
@@ -366,8 +368,8 @@ useEffect(() => {
 
   const handleCustomAlertModalClose = (success: boolean) => {
     setIsCustomAlertModalOpen(false);
-    if(success) {
-        setAlertMessage(translate('weather.alert.success'));
+    if (success) {
+      setAlertMessage(translate('weather.alert.success'));
     }
   };
 
@@ -386,96 +388,95 @@ useEffect(() => {
       {displayLocation && <SetWeatherAlertDialog isOpen={isCustomAlertModalOpen} onClose={handleCustomAlertModalClose} location={displayLocation} />}
 
       <div className="flex items-center mb-6">
-          <Icon name="sun" className="h-8 w-8 text-blue-500 mr-3"/>
-          <h2 className="text-2xl font-bold text-gray-700">{translate('weather.title')}</h2>
+        <Icon name="sun" className="h-8 w-8 text-blue-500 mr-3" />
+        <h2 className="text-2xl font-bold text-gray-700">{translate('weather.title')}</h2>
       </div>
       <p className="text-gray-600 mb-6">{translate('weather.description')}</p>
-      
+
       <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl mb-6 shadow-md border border-gray-200/80">
         <div className="flex flex-col md:flex-row items-stretch w-full gap-2">
-            <div className="relative w-full" ref={suggestionsRef}>
-                <div className="flex items-center w-full border border-gray-300 rounded-lg shadow-sm bg-white focus-within:ring-2 focus-within:ring-green-500 focus-within:border-green-500 transition-all overflow-hidden h-full">
-                    <div className="pl-3 text-gray-400 pointer-events-none shrink-0">
-                        <Icon name="search" className="h-5 w-5" />
-                    </div>
-                    <input
-                        type="text"
-                        value={location}
-                        onChange={handleLocationChange}
-                        placeholder={translate('weather.placeholder')}
-                        className="w-full p-3 border-0 bg-transparent focus:ring-0 focus:outline-none text-gray-800 placeholder-gray-500 min-w-0"
-                        disabled={loading}
-                        onKeyDown={(e) => e.key === 'Enter' && handleGetForecastClick()}
-                    />
-                    <button 
-                        onClick={handleLocationDetect} 
-                        disabled={loading}
-                        className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-green-700 bg-gray-50 hover:bg-gray-100 border-l border-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap h-full"
-                        aria-label={translate('weather.myLocation')}
-                    >
-                        <Icon name="location" className="h-5 w-5"/>
-                        <span className="hidden sm:inline">{translate('weather.myLocation')}</span>
-                    </button>
-                </div>
-                {isSuggestionsOpen && (
-                    <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-300 rounded-b-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
-                        <ul>
-                            {suggestions.map((suggestion, index) => (
-                                <li
-                                    key={index}
-                                    onClick={() => handleSuggestionClick(suggestion)}
-                                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                >
-                                    {suggestion}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
-
-            <button
-                onClick={handleGetForecastClick}
+          <div className="relative w-full" ref={suggestionsRef}>
+            <div className="flex items-center w-full border border-gray-300 rounded-lg shadow-sm bg-white focus-within:ring-2 focus-within:ring-green-500 focus-within:border-green-500 transition-all overflow-hidden h-full">
+              <div className="pl-3 text-gray-400 pointer-events-none shrink-0">
+                <Icon name="search" className="h-5 w-5" />
+              </div>
+              <input
+                type="text"
+                value={location}
+                onChange={handleLocationChange}
+                placeholder={translate('weather.placeholder')}
+                className="w-full p-3 border-0 bg-transparent focus:ring-0 focus:outline-none text-gray-800 placeholder-gray-500 min-w-0"
                 disabled={loading}
-                className={`forecast-btn ${weatherClass} w-full md:w-auto flex-shrink-0`}
-            >
-                {loading ? (
-                <div className="flex items-center justify-center">
-                    <div className="relative h-5 w-5 mr-3 animate-pulse-icon flex items-center justify-center">
-                        {animatedIcons.map((iconName, index) => (
-                            <Icon
-                                key={iconName}
-                                name={iconName}
-                                className={`h-5 w-5 text-white absolute transition-opacity duration-500 ${
-                                    animatedIconIndex === index ? 'opacity-100' : 'opacity-0'
-                                }`}
-                            />
-                        ))}
-                    </div>
-                    {translate('weather.forecasting')}
+                onKeyDown={(e) => e.key === 'Enter' && handleGetForecastClick()}
+              />
+              <button
+                onClick={handleLocationDetect}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-green-700 bg-gray-50 hover:bg-gray-100 border-l border-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap h-full"
+                aria-label={translate('weather.myLocation')}
+              >
+                <Icon name="location" className="h-5 w-5" />
+                <span className="hidden sm:inline">{translate('weather.myLocation')}</span>
+              </button>
+            </div>
+            {isSuggestionsOpen && (
+              <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-300 rounded-b-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
+                <ul>
+                  {suggestions.map((suggestion, index) => (
+                    <li
+                      key={index}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {suggestion}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={handleGetForecastClick}
+            disabled={loading}
+            className={`forecast-btn ${weatherClass} w-full md:w-auto flex-shrink-0`}
+          >
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <div className="relative h-5 w-5 mr-3 animate-pulse-icon flex items-center justify-center">
+                  {animatedIcons.map((iconName, index) => (
+                    <Icon
+                      key={iconName}
+                      name={iconName}
+                      className={`h-5 w-5 text-white absolute transition-opacity duration-500 ${animatedIconIndex === index ? 'opacity-100' : 'opacity-0'
+                        }`}
+                    />
+                  ))}
                 </div>
-                ) : translate('weather.getForecast')}
-            </button>
+                {translate('weather.forecasting')}
+              </div>
+            ) : translate('weather.getForecast')}
+          </button>
         </div>
       </div>
 
       {error && <p className="text-red-600 bg-red-100 p-3 rounded-lg text-center border border-red-200 mb-4">{error}</p>}
       {alertMessage && <p className="text-blue-600 bg-blue-100 p-3 rounded-lg text-center border border-blue-200 mb-4">{alertMessage}</p>}
       {activeAlert && <div className="mb-4 animate-fade-in"><AlertDisplay alert={activeAlert} /></div>}
-      
+
       <div className="mt-8">
         <div>
           {loading && !weatherData && (
             <div className="h-full flex flex-col items-center justify-center bg-gray-50/70 rounded-lg p-8 text-center border">
-                <div className="w-12 h-12 border-4 border-green-500 border-dashed rounded-full animate-spin"></div>
-                <p className="text-gray-500 mt-4">{translate('weather.forecasting')}</p>
+              <div className="w-12 h-12 border-4 border-green-500 border-dashed rounded-full animate-spin"></div>
+              <p className="text-gray-500 mt-4">{translate('weather.forecasting')}</p>
             </div>
           )}
           {!loading && !weatherData && !error && (
-             <div className="h-full flex flex-col items-center justify-center bg-gray-50/70 rounded-lg p-8 text-center border">
-                <Icon name="sun" className="h-12 w-12 text-gray-400 mb-4"/>
-                <h3 className="text-xl font-bold text-gray-700">{translate('weather.welcome.title')}</h3>
-                <p className="text-gray-500 mt-2">{translate('weather.welcome.subtitle')}</p>
+            <div className="h-full flex flex-col items-center justify-center bg-gray-50/70 rounded-lg p-8 text-center border">
+              <Icon name="sun" className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-xl font-bold text-gray-700">{translate('weather.welcome.title')}</h3>
+              <p className="text-gray-500 mt-2">{translate('weather.welcome.subtitle')}</p>
             </div>
           )}
           {weatherData && (
@@ -483,30 +484,30 @@ useEffect(() => {
               <div className="p-6 rounded-lg border bg-white/70 border-gray-200">
                 <h3 className="text-xl font-semibold text-gray-800 mb-2">{translate('weather.currentConditions', { location: displayLocation })}</h3>
                 {weatherData.seasonalContext && (
-                    <p className="text-sm text-gray-600 italic mb-4">{weatherData.seasonalContext}</p>
+                  <p className="text-sm text-gray-600 italic mb-4">{weatherData.seasonalContext}</p>
                 )}
                 <div className="flex flex-wrap justify-between items-center gap-4">
-                    <div className="flex items-center">
-                        <Icon name={getWeatherIcon(weatherData.currentWeather.condition)} className="h-16 w-16 text-blue-500 mr-4"/>
-                        <div>
-                            <p className="text-4xl font-bold text-gray-900">{weatherData.currentWeather.temperature}°C</p>
-                            <p className="text-lg text-gray-600">{weatherData.currentWeather.condition}</p>
-                        </div>
+                  <div className="flex items-center">
+                    <Icon name={getWeatherIcon(weatherData.currentWeather.condition)} className="h-16 w-16 text-blue-500 mr-4" />
+                    <div>
+                      <p className="text-4xl font-bold text-gray-900">{weatherData.currentWeather.temperature}°C</p>
+                      <p className="text-lg text-gray-600">{weatherData.currentWeather.condition}</p>
                     </div>
-                    <div className="text-right text-gray-600">
-                        <p>{translate('weather.humidity')}: {weatherData.currentWeather.humidity}%</p>
-                        <p>{translate('weather.wind')}: {weatherData.currentWeather.windSpeed} km/h</p>
-                    </div>
+                  </div>
+                  <div className="text-right text-gray-600">
+                    <p>{translate('weather.humidity')}: {weatherData.currentWeather.humidity}%</p>
+                    <p>{translate('weather.wind')}: {weatherData.currentWeather.windSpeed} km/h</p>
+                  </div>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-xl font-semibold text-gray-800 mb-4">{translate('weather.forecast5day')}</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                   {weatherData.dailyForecast?.map((day, index) => (
                     <div key={index} className="bg-white/70 p-4 rounded-lg text-center border border-gray-200">
                       <p className="font-bold text-gray-800">{day.day}</p>
-                      <Icon name={getWeatherIcon(day.condition)} className="h-10 w-10 text-blue-500/90 mx-auto my-2"/>
+                      <Icon name={getWeatherIcon(day.condition)} className="h-10 w-10 text-blue-500/90 mx-auto my-2" />
                       <p className="text-sm text-gray-500">{day.condition}</p>
                       <div className="mt-2">
                         <span className="font-semibold text-gray-800">{day.high}°</span>
@@ -516,75 +517,104 @@ useEffect(() => {
                   ))}
                 </div>
               </div>
-               {relevantCustomAlerts.length > 0 && (
+              {relevantCustomAlerts.length > 0 && (
                 <div className="p-4 bg-gray-50 rounded-lg border">
-                    <h4 className="font-semibold text-gray-700 mb-2">{translate('weather.activeAlerts')}</h4>
-                    <ul className="space-y-1 text-sm text-gray-600">
-                        {relevantCustomAlerts.map(alert => alert.type === 'weather' && (
-                            <li key={alert.id}>• {translate('weather.alert.notifyWhen', {
-                                condition: alert.condition,
-                                operator: translate(alert.operator === 'lte' ? 'weather.alert.below' : 'weather.alert.above'),
-                                value: alert.value
-                            })}</li>
-                        ))}
-                    </ul>
+                  <h4 className="font-semibold text-gray-700 mb-2">{translate('weather.activeAlerts')}</h4>
+                  <ul className="space-y-1 text-sm text-gray-600">
+                    {relevantCustomAlerts.map(alert => alert.type === 'weather' && (
+                      <li key={alert.id}>• {translate('weather.alert.notifyWhen', {
+                        condition: alert.condition,
+                        operator: translate(alert.operator === 'lte' ? 'weather.alert.below' : 'weather.alert.above'),
+                        value: alert.value
+                      })}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
               {coordinates && (
                 <div className="mt-8 animate-fade-in-up">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">{translate('weather.map')}</h3>
-                    <div id="map" ref={mapContainerRef}></div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">{translate('weather.map')}</h3>
+                  <div id="map" ref={mapContainerRef}></div>
                 </div>
               )}
 
               <div className="text-center pt-4 flex justify-center flex-wrap gap-4">
-                  <Button onClick={handleAnalyzeMicroclimate} disabled={!weatherData || loading || microclimateLoading}>
-                      {microclimateLoading ? <Spinner /> : translate('weather.analyzeMicroclimate')}
-                  </Button>
-                  <Button onClick={() => setIsCustomAlertModalOpen(true)} disabled={!weatherData || loading} variant="secondary">
-                      {translate('weather.setCustomAlert')}
-                  </Button>
+                <Button onClick={handleAnalyzeMicroclimate} disabled={!weatherData || loading || microclimateLoading}>
+                  {microclimateLoading ? <Spinner /> : translate('weather.analyzeMicroclimate')}
+                </Button>
+                <Button onClick={() => setIsCustomAlertModalOpen(true)} disabled={!weatherData || loading} variant="secondary">
+                  {translate('weather.setCustomAlert')}
+                </Button>
               </div>
             </div>
           )}
         </div>
       </div>
-      
+
       {microclimateError && <p className="text-red-600 bg-red-100 p-3 mt-6 rounded-lg text-center border border-red-200">{microclimateError}</p>}
-      
+
       {microclimateLoading && (
         <div className="mt-6 text-center">
           <div className="w-12 h-12 mx-auto border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
           <p className="text-gray-500 mt-4">{translate('weather.microclimate.analyzing')}</p>
         </div>
       )}
-      
+
       {microclimateData && (
         <div className="mt-8 animate-fade-in">
-            <div className="flex items-center mb-4">
-                <Icon name="sparkles" className="h-8 w-8 text-blue-500 mr-3"/>
-                <h3 className="text-2xl font-bold text-gray-700">{translate('weather.microclimate.title')}</h3>
-            </div>
-            <p className="text-gray-600 mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <strong>{translate('weather.microclimate.topography')}</strong> {microclimateData.inferredTopography}
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {microclimateData.zones?.map((zone, index) => (
-                    <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                        <div className="flex justify-between items-start">
-                             <h4 className="font-bold text-lg text-blue-800">{zone.zoneName}</h4>
-                             <span className="font-bold text-xl text-blue-700 bg-blue-100 px-3 py-1 rounded-full">{zone.temperatureDelta}</span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-2">{zone.description}</p>
-                        <p className="text-sm font-semibold text-red-600 mt-3 p-2 bg-red-50 rounded-md border border-red-100">
-                            <strong>Risk:</strong> {zone.risk}
-                        </p>
-                    </div>
-                ))}
-            </div>
+          <div className="flex items-center mb-4">
+            <Icon name="sparkles" className="h-8 w-8 text-blue-500 mr-3" />
+            <h3 className="text-2xl font-bold text-gray-700">{translate('weather.microclimate.title')}</h3>
+          </div>
+          <p className="text-gray-600 mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <strong>{translate('weather.microclimate.topography')}</strong> {microclimateData.inferredTopography}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {microclimateData.zones?.map((zone, index) => (
+              <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <h4 className="font-bold text-lg text-blue-800">{zone.zoneName}</h4>
+                  <span className="font-bold text-xl text-blue-700 bg-blue-100 px-3 py-1 rounded-full">{zone.temperatureDelta}</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">{zone.description}</p>
+                <p className="text-sm font-semibold text-red-600 mt-3 p-2 bg-red-50 rounded-md border border-red-100">
+                  <strong>Risk:</strong> {zone.risk}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* Embedded Satellite Farm Twin View Toggle */}
+      <div className="mt-12 pt-8 border-t border-gray-200">
+        <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
+          <div className="flex items-center">
+            <div className="bg-indigo-100 p-2 rounded-lg mr-4">
+              <Icon name="globe" className="h-6 w-6 text-indigo-600" />
+            </div>
+            <div>
+              <h4 className="font-bold text-gray-800 text-lg">NDVI Analysis</h4>
+              <p className="text-sm text-gray-500">Analyze your farm's health from space using Sentinel-2 imagery.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowSatellite(!showSatellite)}
+            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${showSatellite ? 'bg-indigo-600' : 'bg-gray-300'}`}
+            role="switch"
+            aria-checked={showSatellite}
+          >
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${showSatellite ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {showSatellite && (
+          <div className="animate-fade-in">
+            <SatelliteFarmTwin />
+          </div>
+        )}
+      </div>
 
     </Card>
   );

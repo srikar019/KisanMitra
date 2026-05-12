@@ -3,6 +3,8 @@ import type { DealRequest, ProductListing, NegotiationTerms, NegotiationChat, Ne
 import { getOpeningOffer, getNextNegotiationStep } from './geminiService';
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
+import { generatePassportFromFarmData, createProductPassport, getFarmerVerification } from './trustService';
+import { validateRequired, validateNumber, validatePrice, validateLocation, sanitizeInput } from './validationService';
 
 /** Shape of an inquiry message from Firestore */
 interface InquiryMessage {
@@ -159,15 +161,37 @@ export const updateDealRequestStatus = async (dealId: string, status: 'read'): P
 };
 
 export const addListing = async (listingData: Omit<ProductListing, 'id' | 'createdAt' | 'farmerUid' | 'farmerEmail' | 'imageUrl' | 'farmerName' | 'location' | 'farmerPhoneNumber'>, farmer: {uid: string, email: string, name: string, location: string, phoneNumber?: string}): Promise<void> => {
+    // ── Input validation ──
+    const cropCheck = validateRequired(listingData.cropName, 'Crop name', 200);
+    if (!cropCheck.isValid) throw new Error(cropCheck.error);
+
+    const priceCheck = validatePrice(listingData.price);
+    if (!priceCheck.isValid) throw new Error(priceCheck.error);
+
+    const qtyCheck = validateNumber(listingData.quantity, 'Quantity', 0.01, 1_000_000);
+    if (!qtyCheck.isValid) throw new Error(qtyCheck.error);
+
+    const locCheck = validateLocation(farmer.location);
+    if (!locCheck.isValid) throw new Error(locCheck.error);
+
+    if (listingData.description) {
+        const descCheck = validateRequired(listingData.description, 'Description', 2000);
+        if (!descCheck.isValid) throw new Error(descCheck.error);
+    }
+
     const productRef = firestore.collection('products').doc();
     const imageUrl = '';
     
     const dataToSet: Omit<ProductListing, 'id' | 'createdAt'> = {
         ...listingData,
+        // Sanitize all user-supplied text fields
+        cropName: sanitizeInput(listingData.cropName.trim()),
+        description: listingData.description ? sanitizeInput(listingData.description.trim()) : '',
+        unit: sanitizeInput((listingData.unit || 'kg').trim()),
         farmerUid: farmer.uid,
         farmerEmail: farmer.email,
-        farmerName: farmer.name,
-        location: farmer.location,
+        farmerName: sanitizeInput(farmer.name.trim()),
+        location: sanitizeInput(farmer.location.trim()),
         farmerPhoneNumber: farmer.phoneNumber || '',
         imageUrl,
         price: listingData.listingType === 'retail' ? listingData.price : (listingData.targetPrice || listingData.price),
@@ -177,6 +201,25 @@ export const addListing = async (listingData: Omit<ProductListing, 'id' | 'creat
         ...dataToSet,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+
+    // ── Auto-generate Health Passport from existing farm data ──
+    // Wait for it to finish so the UI has it immediately
+    try {
+        const verification = await getFarmerVerification(farmer.uid);
+        
+        const listing: ProductListing = {
+            id: productRef.id,
+            ...dataToSet,
+            createdAt: new Date(),
+        };
+
+        const passport = await generatePassportFromFarmData(listing, verification);
+        await createProductPassport(passport);
+        console.log(`✅ Health Passport auto-generated for listing ${productRef.id}`);
+    } catch (err) {
+        console.warn('Health Passport auto-generation skipped:', err);
+        // Non-critical — listing still works without a passport
+    }
 };
 
 export const onProductsSnapshot = (callback: (listings: ProductListing[]) => void): () => void => {
@@ -309,7 +352,7 @@ export const updateRetailOrderStatus = async (orderId: string, status: 'processi
 
 export const startNegotiationChat = async (listing: ProductListing, customer: FarmerProfile, language?: string): Promise<string> => {
     const chatId = `${listing.id}_${customer.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    const chatRef = firestore.collection('negotiationChats').doc(chatId);
+    const chatRef = firestore.collection('negotiations').doc(chatId);
     const chatDoc = await chatRef.get();
 
     if (!chatDoc.exists) {
@@ -350,7 +393,7 @@ export const startNegotiationChat = async (listing: ProductListing, customer: Fa
 };
 
 export const onNegotiationChatSnapshot = (chatId: string, callback: (chat: NegotiationChat | null) => void): (() => void) => {
-    return firestore.collection('negotiationChats').doc(chatId)
+    return firestore.collection('negotiations').doc(chatId)
         .onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data() || {};
@@ -368,7 +411,7 @@ export const onNegotiationChatSnapshot = (chatId: string, callback: (chat: Negot
 
 
 export const onNegotiationMessagesSnapshot = (chatId: string, callback: (messages: NegotiationChatMessage[]) => void): () => void => {
-    return firestore.collection('negotiationChats').doc(chatId).collection('messages')
+    return firestore.collection('negotiations').doc(chatId).collection('messages')
         .orderBy('timestamp', 'asc')
         .onSnapshot(snapshot => {
             const messages = snapshot.docs.map(doc => ({
@@ -381,7 +424,7 @@ export const onNegotiationMessagesSnapshot = (chatId: string, callback: (message
 };
 
 export const postCustomerMessageAndGetResponse = async (chatId: string, listing: ProductListing, customerMessage: string, currentHistory: NegotiationChatMessage[], language?: string): Promise<void> => {
-    const messagesRef = firestore.collection('negotiationChats').doc(chatId).collection('messages');
+    const messagesRef = firestore.collection('negotiations').doc(chatId).collection('messages');
 
     await messagesRef.add({
         role: 'model', 
@@ -412,7 +455,7 @@ export const postCustomerMessageAndGetResponse = async (chatId: string, listing:
     });
 
     if (response.isDealClose && response.dealSummary) {
-        const chatRef = firestore.collection('negotiationChats').doc(chatId);
+        const chatRef = firestore.collection('negotiations').doc(chatId);
         await chatRef.update({
             status: 'awaiting-authorization',
             proposedDeal: response.dealSummary,
@@ -422,7 +465,7 @@ export const postCustomerMessageAndGetResponse = async (chatId: string, listing:
 };
 
 const finalizeDealAndNotifyFarmer = async (chatId: string, listing: ProductListing, dealSummary: NonNullable<NegotiationResponse['dealSummary']>) => {
-    const chatRef = firestore.collection('negotiationChats').doc(chatId);
+    const chatRef = firestore.collection('negotiations').doc(chatId);
     await chatRef.update({
         status: 'deal-made',
         dealSummary: dealSummary,
@@ -446,7 +489,7 @@ const finalizeDealAndNotifyFarmer = async (chatId: string, listing: ProductListi
 
 
 export const customerAuthorizeDeal = async (chatId: string, listing: ProductListing): Promise<void> => {
-    const chatRef = firestore.collection('negotiationChats').doc(chatId);
+    const chatRef = firestore.collection('negotiations').doc(chatId);
     const chatDoc = await chatRef.get();
     if (!chatDoc.exists) throw new Error("Chat not found.");
     const chatData = chatDoc.data() as NegotiationChat;
@@ -455,7 +498,7 @@ export const customerAuthorizeDeal = async (chatId: string, listing: ProductList
         throw new Error("No deal is currently proposed for authorization.");
     }
 
-    const messagesRef = firestore.collection('negotiationChats').doc(chatId).collection('messages');
+    const messagesRef = firestore.collection('negotiations').doc(chatId).collection('messages');
     await messagesRef.add({
         role: 'model', 
         content: 'I agree to these terms. The deal is authorized.',
@@ -487,12 +530,12 @@ export const updateDealNotificationStatus = async (notificationId: string, statu
 };
 
 export const onDealsForCustomerSnapshot = (
-    customerEmail: string, 
+    customerUid: string, 
     callback: (deals: NegotiationChat[]) => void,
     onError: (error: Error) => void
 ): (() => void) => {
-    const q = firestore.collection('negotiationChats')
-        .where('customerEmail', '==', customerEmail)
+    const q = firestore.collection('negotiations')
+        .where('customerUid', '==', customerUid)
         .where('status', '==', 'deal-made');
 
     return q.onSnapshot(
@@ -517,12 +560,12 @@ export const onDealsForCustomerSnapshot = (
 };
 
 export const onActiveNegotiationsForCustomerSnapshot = (
-    customerEmail: string,
+    customerUid: string,
     callback: (deals: NegotiationChat[]) => void,
     onError: (error: Error) => void
 ): (() => void) => {
-    const q = firestore.collection('negotiationChats')
-        .where('customerEmail', '==', customerEmail)
+    const q = firestore.collection('negotiations')
+        .where('customerUid', '==', customerUid)
         .where('status', 'in', ['active', 'awaiting-authorization']);
 
     return q.onSnapshot(
@@ -547,12 +590,12 @@ export const onActiveNegotiationsForCustomerSnapshot = (
 };
 
 export const onRetailOrdersForCustomerSnapshot = (
-    customerEmail: string,
+    customerUid: string,
     callback: (orders: RetailOrder[]) => void,
     onError: (error: Error) => void
 ): (() => void) => {
     const q = firestore.collection('retailOrders')
-        .where('customerEmail', '==', customerEmail);
+        .where('customerUid', '==', customerUid);
 
     return q.onSnapshot(
         (snapshot) => {
@@ -607,7 +650,7 @@ export const onNegotiatedDealsForFarmerSnapshot = (
     callback: (deals: NegotiationChat[]) => void,
     onError: (error: Error) => void
 ): (() => void) => {
-    const q = firestore.collection('negotiationChats')
+    const q = firestore.collection('negotiations')
         .where('farmerUid', '==', farmerUid)
         .where('status', '==', 'deal-made');
 
@@ -744,8 +787,8 @@ export const cancelCSASubscription = async (subscriptionId: string): Promise<voi
     await firestore.collection('csaSubscriptions').doc(subscriptionId).delete();
 };
 
-export const onCSASubscriptionsForCustomerSnapshot = (customerEmail: string, callback: (subscriptions: CSASubscription[]) => void): () => void => {
-    const q = firestore.collection('csaSubscriptions').where('customerEmail', '==', customerEmail);
+export const onCSASubscriptionsForCustomerSnapshot = (customerUid: string, callback: (subscriptions: CSASubscription[]) => void): () => void => {
+    const q = firestore.collection('csaSubscriptions').where('customerUid', '==', customerUid);
     return q.onSnapshot(snapshot => {
         const subscriptions = snapshot.docs.map(doc => {
             const data = doc.data();

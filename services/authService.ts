@@ -1,18 +1,29 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
-import { auth } from './firebase';
+import { auth, firestore } from './firebase';
 import { ensureUserProfile, getUserProfile } from './userService';
 
-export const signUp = async (email: string, password: string, role: 'farmer' | 'customer') => {
+export const signUp = async (email: string, password: string, role: 'farmer' | 'customer', username?: string) => {
     const { user } = await auth.createUserWithEmailAndPassword(email, password);
     if (user) {
-        await ensureUserProfile(user, role);
+        await ensureUserProfile(user, role, username);
     }
     return user;
 };
 
-export const signIn = async (email: string, password: string, portalRole: 'farmer' | 'customer') => {
-    const { user } = await auth.signInWithEmailAndPassword(email, password);
+export const signIn = async (emailOrUsername: string, password: string, portalRole: 'farmer' | 'customer') => {
+    let emailToUse = emailOrUsername;
+
+    // If it doesn't look like an email, assume it's a username and fetch the mapped email from Firestore
+    if (!emailOrUsername.includes('@')) {
+        const snapshot = await firestore.collection('users').where('username', '==', emailOrUsername).limit(1).get();
+        if (snapshot.empty) {
+            throw new Error('auth/invalid-credential');
+        }
+        emailToUse = snapshot.docs[0].data().email;
+    }
+
+    const { user } = await auth.signInWithEmailAndPassword(emailToUse, password);
     if (user) {
         // Fetch the user's profile to verify their role against the portal they're using.
         const profile = await getUserProfile(user.uid);
@@ -22,9 +33,9 @@ export const signIn = async (email: string, password: string, portalRole: 'farme
         if (profile && profile.role && profile.role !== portalRole && profile.role !== 'admin') {
             await auth.signOut(); // Immediately sign them out.
             // Throw the generic 'invalid-credential' error to avoid revealing account details.
-            throw new Error('auth/invalid-credential'); 
+            throw new Error('auth/invalid-credential');
         }
-        
+
         // If roles match, or if the user is new/roleless, ensure the profile is up-to-date.
         await ensureUserProfile(user, portalRole);
     }
@@ -58,7 +69,7 @@ export const signInWithGoogle = async (portalRole: 'farmer' | 'customer') => {
             const otherPortal = profile.role === 'farmer' ? 'Farmer' : 'Customer';
             throw new Error(`This account is registered as a ${profile.role}. Please sign in via the ${otherPortal} Portal.`);
         }
-        
+
         await ensureUserProfile(user, portalRole);
     }
     return user;

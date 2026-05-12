@@ -1,12 +1,31 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import { ActiveView } from '../types';
 import type { WeatherData, DiseaseReport, PlantingRecommendation, PlantingRequest, DiseaseHotspot, SoilHealthReport, PlantingRecommendationResponse, CropPricePrediction, WebSource, ChatMessage, NegotiationTerms, NegotiationResponse, CropYieldRequest, CropYieldResponse, PriceBrokerAnalysis, MicroclimateAnalysis, Alert, Livestock, LivestockHealthAnalysis, ProfitForecastRequest, ProfitForecastResponse, IndianAgriNewsResponse, RecipeResponse, ParsedListItem, ParsedCommand, DynamicSubscriptionPreferences, WeeklyProduceItem, CuratedItem, CSATier, FarmMachinery, MachineryRentalRequest, Zone, ProductListing } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set");
-}
+// ── Server-side Gemini proxy ────────────────────────────────────────
+// API key stays on the server. Browser calls /api/gemini which forwards
+// to the Gemini SDK server-side (Vite middleware in dev, Vercel fn in prod).
+const geminiProxy = async (params: { model: string; contents: any; config?: any }): Promise<{ text: string }> => {
+    const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Gemini request failed' }));
+        throw new Error(err.error || `Gemini proxy error: ${res.status}`);
+    }
+    return res.json();
+};
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Convenience wrapper that matches the old ai.models.generateContent() shape
+const ai = {
+    models: {
+        generateContent: async (params: { model: string; contents: any; config?: any }) => {
+            return geminiProxy(params);
+        },
+    },
+};
 
 // Tavily search via API route (avoids CORS issues)
 const tavilySearch = async (query: string, options: { maxResults?: number; searchDepth?: string; topic?: string } = {}) => {
@@ -21,18 +40,41 @@ const tavilySearch = async (query: string, options: { maxResults?: number; searc
     return response.json();
 };
 
-const diseaseReportCache = new Map<string, DiseaseReport>();
-const soilHealthCache = new Map<string, SoilHealthReport>();
-const weatherCache = new Map<string, WeatherData>();
-const plantingRecommendationsCache = new Map<string, PlantingRecommendationResponse>();
+class TTLCache<T> {
+    private cache = new Map<string, { value: T; expiresAt: number }>();
+    constructor(private ttlMs: number) {}
+    has(key: string): boolean {
+        const item = this.cache.get(key);
+        if (!item) return false;
+        if (Date.now() > item.expiresAt) {
+            this.cache.delete(key);
+            return false;
+        }
+        return true;
+    }
+    get(key: string): T | undefined {
+        return this.cache.get(key)?.value;
+    }
+    set(key: string, value: T): this {
+        this.cache.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+        return this;
+    }
+}
 
-const coordinatesCache = new Map<string, { lat: number; lng: number }>();
-const marketPriceCache = new Map<string, CropPricePrediction>();
-const microclimateCache = new Map<string, MicroclimateAnalysis>();
-const profitForecastCache = new Map<string, ProfitForecastResponse>();
-let diseaseHotspotsCache: DiseaseHotspot[] | null = null;
-const indianAgriNewsCache = new Map<string, IndianAgriNewsResponse>();
-const recipeCache = new Map<string, RecipeResponse>();
+const FIVE_MINUTES = 5 * 60 * 1000;
+const ONE_HOUR = 60 * 60 * 1000;
+
+const diseaseReportCache = new TTLCache<DiseaseReport>(ONE_HOUR);
+const soilHealthCache = new TTLCache<SoilHealthReport>(ONE_HOUR);
+const weatherCache = new TTLCache<WeatherData>(ONE_HOUR);
+const plantingRecommendationsCache = new TTLCache<PlantingRecommendationResponse>(ONE_HOUR);
+const coordinatesCache = new TTLCache<{ lat: number; lng: number }>(ONE_HOUR * 24);
+const marketPriceCache = new TTLCache<CropPricePrediction>(FIVE_MINUTES);
+const microclimateCache = new TTLCache<MicroclimateAnalysis>(ONE_HOUR);
+const profitForecastCache = new TTLCache<ProfitForecastResponse>(ONE_HOUR);
+let diseaseHotspotsCache: { data: DiseaseHotspot[], expiresAt: number } | null = null;
+const indianAgriNewsCache = new TTLCache<IndianAgriNewsResponse>(FIVE_MINUTES);
+const recipeCache = new TTLCache<RecipeResponse>(ONE_HOUR);
 
 const handleGeminiError = (error: unknown, context: string): never => {
     console.error(`Error ${context}:`, error);
@@ -358,6 +400,8 @@ export const getLivestockHealthAnalysis = async (animal: Livestock, language: st
 };
 
 export const getPlantingRecommendations = async (request: PlantingRequest, language: string = 'en'): Promise<PlantingRecommendationResponse> => {
+    const cacheKey = `${request.cropType}|${request.location}|${request.soilType}|${request.previousCrop}|lang:${language}`;
+    if (plantingRecommendationsCache.has(cacheKey)) return plantingRecommendationsCache.get(cacheKey)!;
     try {
         const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         const response = await ai.models.generateContent({
@@ -389,6 +433,7 @@ export const getPlantingRecommendations = async (request: PlantingRequest, langu
             },
         });
         const data = JSON.parse(response.text || '{}') as PlantingRecommendationResponse;
+        plantingRecommendationsCache.set(cacheKey, data);
         return data;
     } catch (error) {
         return handleGeminiError(error, 'getting planting recommendations');
@@ -396,6 +441,8 @@ export const getPlantingRecommendations = async (request: PlantingRequest, langu
 };
 
 export const getMarketPricePrediction = async (cropName: string, location: string, startDate: string, endDate: string, language: string = 'en'): Promise<CropPricePrediction> => {
+    const cacheKey = `${cropName}|${location}|${startDate}|${endDate}|lang:${language}`;
+    if (marketPriceCache.has(cacheKey)) return marketPriceCache.get(cacheKey)!;
     try {
         const searchResults = await tavilySearch(`Current market price prediction and trends for ${cropName} in ${location} ${startDate} to ${endDate}`, {
             searchDepth: "advanced",
@@ -420,13 +467,108 @@ export const getMarketPricePrediction = async (cropName: string, location: strin
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
         const sources: WebSource[] = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title || 'Source' }));
-        return { ...parsed, sources };
+        const result = { ...parsed, sources };
+        marketPriceCache.set(cacheKey, result);
+        return result;
     } catch (error) {
         return handleGeminiError(error, 'getting market price prediction');
     }
 };
 
+export interface LiveCommodityData {
+    name: string;
+    symbol: string;
+    exchange: string;
+    currentPrice: number;
+    unit: string;
+    change24h: number;
+    changePercent24h: number;
+    trend: 'up' | 'down' | 'stable';
+    dayHigh: number;
+    dayLow: number;
+    tradingStatus: 'active_futures' | 'spot_only' | 'suspended';
+    lastUpdated: string;
+    sourceUrl?: string;
+}
+
+const liveCommodityCache = new Map<string, { data: LiveCommodityData[], timestamp: number }>();
+const LIVE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+export const getLiveCommodityPrices = async (commodityNames: string[], language: string = 'en', targetDate?: string): Promise<LiveCommodityData[]> => {
+    const dateStr = targetDate || 'today';
+    const cacheKey = [commodityNames.map(n => n.trim().toLowerCase()).sort().join('|'), dateStr].join('_');
+    const cached = liveCommodityCache.get(cacheKey);
+    // Only cache if it's Live data. For historical data, we can cache it longer, but for simplicity we reuse the cache.
+    // If it's historical data, we can increase the TTL or just let it expire normally.
+    if (cached && Date.now() - cached.timestamp < (targetDate ? 24 * 60 * 60 * 1000 : LIVE_CACHE_TTL)) {
+        return cached.data;
+    }
+
+    try {
+        const queryDateString = targetDate ? `on date ${targetDate}` : `today April 2026`;
+        const searchQuery = `Current mandi spot price NCDEX MCX ${queryDateString} ${commodityNames.join(', ')} India per quintal per bale`;
+        const searchResults = await tavilySearch(searchQuery, {
+            searchDepth: "advanced",
+            maxResults: 8
+        });
+        const context = searchResults.results.map((r: any) => `Source: ${r.title} (${r.url})\n${r.content}`).join('\n\n');
+
+        const promptDate = targetDate ? `for the SPECIFIC DATE ${targetDate}` : `CURRENT`;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `Using this real-time web data:\n${context}\n\nExtract the ${promptDate} market prices for these Indian agricultural commodities: ${commodityNames.join(', ')}.\n\nFor EACH commodity, provide accurate data based on the search results. Use NCDEX/MCX futures prices if available, otherwise use the latest mandi/spot prices. Be accurate — do not invent prices.\n\n${getLanguageInstruction(language)}`,
+            config: {
+                thinkingConfig: { thinkingBudget: 0 },
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        commodities: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    name: { type: Type.STRING, description: "Full commodity name, e.g. 'Wheat' or 'Cotton'" },
+                                    symbol: { type: Type.STRING, description: "Short ticker symbol, e.g. 'WHEAT', 'COTTON'" },
+                                    exchange: { type: Type.STRING, description: "Exchange or market source, e.g. 'NCDEX', 'MCX', 'Mandi Spot'" },
+                                    currentPrice: { type: Type.NUMBER, description: "Current price in INR" },
+                                    unit: { type: Type.STRING, description: "Price unit, e.g. '₹/Qtl' or '₹/Bale'" },
+                                    change24h: { type: Type.NUMBER, description: "Absolute price change in last 24h. Use 0 if unknown." },
+                                    changePercent24h: { type: Type.NUMBER, description: "Percentage change in last 24h. Use 0 if unknown." },
+                                    trend: { type: Type.STRING, description: "'up', 'down', or 'stable'" },
+                                    dayHigh: { type: Type.NUMBER, description: "Day high price. Estimate ±1% of current if unknown." },
+                                    dayLow: { type: Type.NUMBER, description: "Day low price. Estimate ±1% of current if unknown." },
+                                    tradingStatus: { type: Type.STRING, description: "'active_futures' if futures are trading, 'spot_only' if futures suspended but spot available, 'suspended' otherwise" },
+                                    lastUpdated: { type: Type.STRING, description: "Date string of the price data, e.g. 'Apr 19, 2026'" },
+                                    sourceUrl: { type: Type.STRING, description: "URL where this price was found. Optional." },
+                                },
+                                required: ['name', 'symbol', 'exchange', 'currentPrice', 'unit', 'change24h', 'changePercent24h', 'trend', 'dayHigh', 'dayLow', 'tradingStatus', 'lastUpdated']
+                            }
+                        }
+                    },
+                    required: ['commodities']
+                },
+            },
+        });
+
+        const parsed = JSON.parse(response.text || '{"commodities":[]}');
+        const result: LiveCommodityData[] = (parsed.commodities || []).map((c: any) => ({
+            ...c,
+            trend: c.trend === 'up' ? 'up' : c.trend === 'down' ? 'down' : 'stable',
+            tradingStatus: c.tradingStatus === 'active_futures' ? 'active_futures' : c.tradingStatus === 'suspended' ? 'suspended' : 'spot_only',
+        }));
+
+        liveCommodityCache.set(cacheKey, { data: result, timestamp: Date.now() });
+        return result;
+    } catch (error) {
+        return handleGeminiError(error, 'fetching live commodity prices');
+    }
+};
+
 export const getProfitForecast = async (request: ProfitForecastRequest, language: string = 'en'): Promise<ProfitForecastResponse> => {
+    const cacheKey = `${request.cropName}|${request.location}|lang:${language}`;
+    if (profitForecastCache.has(cacheKey)) return profitForecastCache.get(cacheKey)!;
     try {
         const searchResults = await tavilySearch(`Profit margin forecast, demand, and analysis for ${request.cropName} in ${request.location}`, {
             searchDepth: "advanced",
@@ -449,13 +591,17 @@ export const getProfitForecast = async (request: ProfitForecastRequest, language
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
         const sources: WebSource[] = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title || 'Source' }));
-        return { ...parsed, sources };
+        const result = { ...parsed, sources };
+        profitForecastCache.set(cacheKey, result);
+        return result;
     } catch (error) {
         return handleGeminiError(error, `getting profit forecast`);
     }
 };
 
 export const getIndianAgriNews = async (location?: string, topic?: string, timeFilter?: string, language: string = 'en'): Promise<IndianAgriNewsResponse> => {
+    const cacheKey = `${location}|${topic}|${timeFilter}|lang:${language}`;
+    if (indianAgriNewsCache.has(cacheKey)) return indianAgriNewsCache.get(cacheKey)!;
     try {
         const topicQuery = topic ? ` about ${topic}` : '';
 
@@ -477,7 +623,9 @@ export const getIndianAgriNews = async (location?: string, topic?: string, timeF
         });
         const parsed = JSON.parse(extractJson(response.text || '{}'));
         const sources: WebSource[] = searchResults.results.map((r: any) => ({ uri: r.url, title: r.title || 'Source' }));
-        return { ...parsed, sources };
+        const result = { ...parsed, sources };
+        indianAgriNewsCache.set(cacheKey, result);
+        return result;
     } catch (error) {
         return handleGeminiError(error, 'getting Indian agri news');
     }
@@ -608,13 +756,17 @@ export const getPriceBrokerAnalysis = async (cropName: string, location: string,
 };
 
 export const getMicroclimateAnalysis = async (coords: { lat: number; lng: number }, weatherData: WeatherData, language: string = 'en'): Promise<MicroclimateAnalysis> => {
+    const cacheKey = `${coords.lat},${coords.lng}|lang:${language}`;
+    if (microclimateCache.has(cacheKey)) return microclimateCache.get(cacheKey)!;
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: `Microclimate division for farm at ${coords.lat}, ${coords.lng}. Weather: ${JSON.stringify(weatherData)}. ${getLanguageInstruction(language)} Respond in JSON.`,
             config: { responseMimeType: "application/json" },
         });
-        return JSON.parse(response.text || '{}') as MicroclimateAnalysis;
+        const result = JSON.parse(response.text || '{}') as MicroclimateAnalysis;
+        microclimateCache.set(cacheKey, result);
+        return result;
     } catch (error) {
         return handleGeminiError(error, 'getting microclimate analysis');
     }
@@ -727,3 +879,55 @@ export const parseUserCommand = async (command: string): Promise<ParsedCommand> 
     }
 };
 
+// ── Farm Passport Estimation (Auto-generation) ───────────────
+export const estimateCropAndSoilData = async (cropName: string, location: string): Promise<{
+    soilHealthScore: number;
+    pesticideRisk: string;
+    soilDescription: string;
+    pesticideReasoning: string;
+}> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: {
+                parts: [{
+                    text: `You are an Indian agricultural expert. A farmer in "${location}" is listing "${cropName}" for sale.
+
+Based on your knowledge of Indian agricultural regions, estimate:
+
+1. **Soil Health Score (0-100)**: Consider the typical soil type, fertility, and suitability for this crop in this region of India. 100 = perfect soil for this crop.
+
+2. **Pesticide Risk Level**: Based on common farming practices for "${cropName}" in this region, estimate pesticide usage risk. Consider if this crop typically requires heavy pesticide use or is relatively clean.
+
+3. **Brief soil description**: One sentence about the soil characteristics of this region.
+
+4. **Brief pesticide reasoning**: One sentence explaining the pesticide risk level.
+
+Be realistic and honest. Don't inflate scores.`
+                }]
+            },
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        soilHealthScore: { type: Type.NUMBER },
+                        pesticideRisk: { type: Type.STRING },
+                        soilDescription: { type: Type.STRING },
+                        pesticideReasoning: { type: Type.STRING },
+                    },
+                    required: ['soilHealthScore', 'pesticideRisk', 'soilDescription', 'pesticideReasoning'],
+                },
+            },
+        });
+
+        let jsonStr = response.text || '{}';
+        if (jsonStr.startsWith('```')) {
+            jsonStr = jsonStr.replace(/^```(json)?/, '').replace(/```$/, '').trim();
+        }
+
+        return JSON.parse(jsonStr);
+    } catch (err) {
+        return handleGeminiError(err, 'estimating crop and soil data');
+    }
+};

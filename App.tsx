@@ -21,6 +21,7 @@ import Sidebar from './components/Sidebar';
 const Login = React.lazy(() => import('./components/Login'));
 const CustomerLogin = React.lazy(() => import('./components/CustomerLogin'));
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
+const FarmerDashboard = React.lazy(() => import('./components/FarmerDashboard'));
 const Weather = React.lazy(() => import('./components/Weather'));
 const DiseaseDetection = React.lazy(() => import('./components/DiseaseDetection'));
 const PlantingRecommendations = React.lazy(() => import('./components/PlantingRecommendations'));
@@ -28,7 +29,7 @@ const MarketPrices = React.lazy(() => import('./components/MarketPrices'));
 const CropYieldPrediction = React.lazy(() => import('./components/CropYieldPrediction'));
 const ProfitForecaster = React.lazy(() => import('./components/CropRotation'));
 const DirectMarketplace = React.lazy(() => import('./components/DirectMarketplace').then(m => ({ default: m.default })));
-const CSAManagement = React.lazy(() => import('./components/DirectMarketplace').then(m => ({ default: m.CSAManagement })));
+const CSAManagement = React.lazy(() => import('./components/CSAManagement').then(m => ({ default: m.CSAManagement })));
 const CommunityPage = React.lazy(() => import('./components/CommunityPage'));
 const FarmerChat = React.lazy(() => import('./components/FarmerChat'));
 const NegotiationChat = React.lazy(() => import('./components/NegotiationChat'));
@@ -43,22 +44,23 @@ const Chatbot = React.lazy(() => import('./components/Chatbot'));
 const CustomerPortal = React.lazy(() => import('./components/PriceBroker').then(m => ({ default: m.CustomerPortal })));
 
 // ─── View → Component mapping ────────────────────────────────────────────
-const VIEW_COMPONENT_MAP: Record<string, React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>> = {
-  weather: Weather as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  'health-analysis': DiseaseDetection as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  planting: PlantingRecommendations as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  'market-prices': MarketPrices as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  'yield-prediction': CropYieldPrediction as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  'profit-forecaster': ProfitForecaster as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  marketplace: DirectMarketplace as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  community: CommunityPage as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  'assets-exchange': FarmAssetsExchange as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  csa: CSAManagement as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  features: FeatureStore as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  news: IndianAgriNews as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  profile: FarmerProfilePage as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  deals: FarmerDeals as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
-  'my-farm': MyFarmPage as React.LazyExoticComponent<React.FC<{ onStartChat?: (r: FarmerProfile) => void }>>,
+const VIEW_COMPONENT_MAP: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {
+  dashboard: FarmerDashboard,
+  weather: Weather,
+  'health-analysis': DiseaseDetection,
+  planting: PlantingRecommendations,
+  'market-prices': MarketPrices,
+  'yield-prediction': CropYieldPrediction,
+  'profit-forecaster': ProfitForecaster,
+  marketplace: DirectMarketplace,
+  community: CommunityPage,
+  'assets-exchange': FarmAssetsExchange,
+  csa: CSAManagement,
+  features: FeatureStore,
+  news: IndianAgriNews,
+  profile: FarmerProfilePage,
+  deals: FarmerDeals,
+  'my-farm': MyFarmPage,
 };
 
 // ─── Suspense Fallbacks ───────────────────────────────────────────────────
@@ -116,7 +118,7 @@ const FarmViewRoute: React.FC = () => {
   }, [navigate]);
 
   if (!view || !VIEW_COMPONENT_MAP[viewSlug!]) {
-    return <Navigate to="/farm/weather" replace />;
+    return <Navigate to="/farm/dashboard" replace />;
   }
 
   const ViewComponent = VIEW_COMPONENT_MAP[viewSlug!];
@@ -166,11 +168,11 @@ const FarmerLayout: React.FC = () => {
 
   // Derive the active view from the current URL
   const currentPath = window.location.pathname;
-  const viewSlug = currentPath.split('/farm/')[1]?.split('/')[0] || 'weather';
-  const activeView = pathToView[viewSlug] || ActiveView.Weather;
+  const viewSlug = currentPath.split('/farm/')[1]?.split('/')[0] || 'dashboard';
+  const activeView = pathToView[viewSlug] || ActiveView.Dashboard;
 
   const validViews = Object.values(ActiveView);
-  const defaultFeatures = [ActiveView.Weather];
+  const defaultFeatures = [ActiveView.Dashboard, ActiveView.Weather];
   const userFeatures = (userProfile?.enabledFeatures || []).filter(feature => validViews.includes(feature));
   const combinedFeatures = [...defaultFeatures, ...userFeatures];
   const sidebarFeatures = Array.from(new Set(combinedFeatures));
@@ -264,7 +266,7 @@ const LandingPageWrapper: React.FC = () => {
   // Redirect logged-in users to their portal
   if (currentUser && userProfile) {
     if (userProfile.role === 'admin') return <Navigate to="/admin" replace />;
-    if (userProfile.role === 'farmer') return <Navigate to="/farm/weather" replace />;
+    if (userProfile.role === 'farmer') return <Navigate to="/farm/dashboard" replace />;
     if (userProfile.role === 'customer') return <Navigate to="/customer" replace />;
   }
 
@@ -284,7 +286,7 @@ const FarmerLoginWrapper: React.FC = () => {
   const { currentUser, userProfile, loading } = useAuth();
 
   if (loading) return <FullScreenSpinner />;
-  if (currentUser && userProfile?.role === 'farmer') return <Navigate to="/farm/weather" replace />;
+  if (currentUser && userProfile?.role === 'farmer') return <Navigate to="/farm/dashboard" replace />;
 
   return (
     <Suspense fallback={<FullScreenSpinner />}>
@@ -332,7 +334,7 @@ const App: React.FC = () => {
                     </ProtectedRoute>
                   }
                 >
-                  <Route index element={<Navigate to="weather" replace />} />
+                  <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path=":viewSlug" element={<FarmViewRoute />} />
                   <Route path="chat/:recipientId" element={<FarmChatRoute />} />
                 </Route>
